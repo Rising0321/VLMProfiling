@@ -103,7 +103,7 @@ def main(args):
     checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
     os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
 
-    ava_indexs = load_access_street_view(args.city)
+    ava_indexs = load_access_street_view(args.city)[:20]
 
     task_data = load_task_data(args.city)
 
@@ -118,14 +118,19 @@ def main(args):
 
     # split the dataset into train and test
     train_size = int(0.7 * len(image_dataset))
-    test_size = len(image_dataset) - train_size
-    train_dataset, val_dataset = torch.utils.data.random_split(image_dataset, [train_size, test_size])
+    val_size = int(0.8 * len(image_dataset)) - train_size
+    test_size = len(image_dataset) - train_size - val_size
+    train_dataset, val_dataset, test_dataset = \
+        torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
+
     train_dataset = DownStreamDataset(train_dataset, model)
     val_dataset = DownStreamDataset(val_dataset, model, train_dataset.mean, train_dataset.std)
+    test_dataset = DownStreamDataset(test_dataset, model, train_dataset.mean, train_dataset.std)
 
     # data loader
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     model = Linear(model.embed_dim).to(args.gpu)
 
@@ -133,10 +138,11 @@ def main(args):
     criterion = nn.MSELoss()
 
     best_val = 123456789
+    best_turn = 0
 
     for epoch in range(args.epoch):
         train(model, criterion, optimizer, train_loader, args, epoch)
-        cur_metrics = evaluate(model, train_loader, args, epoch)
+        cur_metrics = evaluate(model, val_loader, args, epoch)
         # evaluate(model, test_loader, args, "test")
         checkpoint_dict = {
             "epoch": epoch + 1,
@@ -149,6 +155,15 @@ def main(args):
                 checkpoints_dir,
             )
             best_val = cur_metrics['mse']
+            best_turn = 0
+        else:
+            best_turn += 1
+            if best_turn > args.patience:
+                break
+    # load state dict
+    checkpoint = torch.load(checkpoints_dir)
+    model.load_state_dict(checkpoint['state_dict'])
+    evaluate(model, test_loader, args, "test")
 
 
 if __name__ == "__main__":
@@ -200,8 +215,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr",
         type=float,
-        default="1e-3",
+        default=1e-3,
         help="lr",
+    )
+
+    parser.add_argument(
+        "--patience",
+        type=int,
+        default=100,
+        help="patience",
     )
 
     args = parser.parse_args()
