@@ -257,9 +257,17 @@ def calc_one(phase, epoch, all_predicts, all_y, loss, name):
     return metrics
 
 
-def calc(phase, epoch, all_predicts, all_y, loss):
-    all_predicts = np.array(all_predicts)
-    all_y = np.array(all_y)
-    calc_one(phase, epoch, all_predicts[:, 0], all_y[:, 0], loss, 'Carbon')
-    calc_one(phase, epoch, all_predicts[:, 1], all_y[:, 1], loss, 'Population')
+def calc(phase, epoch, all_predicts, all_y, all_city, loss):
+    all_predicts = all_predicts
+    all_y = all_y
+    for i in range(4):
+        new_predicts = []
+        new_y = []
+        for j in range(len(all_city)):
+            if all_city[j] == i:
+                new_predicts.append(all_predicts[j])
+                new_y.append(all_y[j])
+        calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: Carbon')
+        calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: Population')
+
     return calc_one(phase, epoch, all_predicts, all_y, loss, 'Total')

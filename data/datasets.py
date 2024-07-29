@@ -29,7 +29,8 @@ class DownStreamDataset(Dataset):
         super().__init__()
         self.imgs = []
         self.labels = []
-        for images, y in tqdm(dataset):
+        self.citys = []
+        for images, y, c in tqdm(dataset):
             y_1, y_2 = y
 
             if y_1 < 0 or y_1 > 10000 or y_2 < 0 or y_2 > 10000:
@@ -47,13 +48,16 @@ class DownStreamDataset(Dataset):
 
             self.imgs.append(image)
             self.labels.append(y)
+            self.citys.append(c)
+
         if mean is None:
             self.mean = mean = np.mean(self.labels, axis=0)
             self.std = std = np.std(self.labels, axis=0)
             print(mean, std)
-        self.labels = (self.labels - mean) / std
 
+        self.labels = (self.labels - mean) / std
         self.labels = torch.tensor(self.labels, dtype=torch.float32)
+        self.citys = torch.tensor(self.citys, dtype=torch.long)
 
     def __len__(self):
         return len(self.imgs)
@@ -63,4 +67,4 @@ class DownStreamDataset(Dataset):
         random.shuffle(imgs)
         imgs = imgs[:10]
         labels = self.labels[index]
-        return torch.tensor(imgs), labels
+        return torch.tensor(imgs), labels, self.citys[index]

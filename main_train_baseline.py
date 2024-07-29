@@ -55,8 +55,9 @@ def train(model, criterion, optimizer, loader, args, epoch):
     model.train()
     all_predictions = []
     all_truths = []
+    all_city = []
     total_loss = 0.0
-    for images, y in loader:
+    for images, y, c in loader:
         images = images.to(device=device)
         y = y.to(device=device).float()
 
@@ -72,28 +73,30 @@ def train(model, criterion, optimizer, loader, args, epoch):
         optimizer.step()
         all_predictions.extend(predicts.cpu().detach().numpy())
         all_truths.extend(y.cpu().detach().numpy())
+        all_city.extend(c.cpu().detach().numpy())
 
-    return calc("Train", epoch, all_predictions, all_truths, total_loss / len(loader))
+    return calc("Train", epoch, all_predictions, all_truths, all_city, total_loss / len(loader))
 
 
 def evaluate(model, loader, args, epoch):
     device = torch.device(args.gpu)
     model.eval()
 
-    all_y, all_predicts = [], []
+    all_y, all_predicts, all_city = [], [], []
     with torch.no_grad():
-        for images, y in loader:
+        for images, y, c in loader:
             images = images.to(device=device)
 
             y = y.to(device=device).float()
 
             predicts = model(images)
 
-            all_y.append(y.cpu().numpy())
-            all_predicts.append(predicts.cpu().numpy())
+            all_y.extend(y.cpu().numpy())
+            all_predicts.extend(predicts.cpu().numpy())
+            all_city.extend(c.cpu().numpy())
     all_y = np.concatenate(all_y)
     all_predicts = np.concatenate(all_predicts)
-    return calc("Eval", epoch, all_predicts, all_y, None)
+    return calc("Eval", epoch, all_predicts, all_y, all_city, None)
 
 
 def main(args):
@@ -103,14 +106,17 @@ def main(args):
     checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
     os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
 
-    ava_indexs = load_access_street_view(args.city)[:20]
-
-    task_data = load_task_data(args.city)
-
     image_dataset = []
-    for index in tqdm(ava_indexs):
-        street_views, images = get_images(index, args.city)
-        image_dataset.append([images, [task_data[0][int(index)][-1], task_data[1][int(index)][-1]]])
+
+    for city in range(4):
+        # todo: for test, can repeat the following code with
+        ava_indexs = load_access_street_view(city)[:5]
+
+        task_data = load_task_data(city)
+
+        for index in tqdm(ava_indexs):
+            street_views, images = get_images(index, city)
+            image_dataset.append([images, [task_data[0][int(index)][-1], task_data[1][int(index)][-1]], city])
 
     # load model
     chkpt_dir = 'baselines/MAE/mae_pretrain_vit_large.pth'
@@ -181,14 +187,6 @@ if __name__ == "__main__":
         type=str,
         default="MAE",
         help="model name",
-    )
-
-    parser.add_argument(
-        "--city",
-        type=int,
-        default=0,
-        choices=[0, 1, 2, 3],  # ["New York City", "San Francisco", "Washington", "Chicago"]
-        help=""
     )
 
     parser.add_argument(
