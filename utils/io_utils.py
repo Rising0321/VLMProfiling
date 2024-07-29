@@ -47,7 +47,7 @@ def parse_edgelist_line(line):
         raise ValueError("Line format is incorrect")
 
 
-def load_access_street_view(city, value_path):
+def load_access_street_view(city, value_path=None):
     temp = os.listdir(f"/home/wangb/OpenVIRL/data/{city_names[city]}")
 
     return temp
@@ -239,7 +239,7 @@ def load_task_data(city):
     return [temp1, temp2]
 
 
-def calc(phase, epoch, all_predicts, all_y, loss):
+def calc_one(phase, epoch, all_predicts, all_y, loss, name):
     metrics = {}
     if loss is not None:
         metrics["loss"] = loss
@@ -249,8 +249,17 @@ def calc(phase, epoch, all_predicts, all_y, loss):
     metrics["mae"] = mean_absolute_error(all_y, all_predicts)
     metrics["mape"] = mean_absolute_percentage_error(all_y, all_predicts)
 
-    print(
-        f"{phase} Epoch: {epoch} "
-        + "\t".join([f"{k}: {round(v, 4):.4f}" for k, v in metrics.items()])
-    )
+    if name != "Total":
+        print(
+            f"{name}: {phase} Epoch: {epoch} "
+            + "\t".join([f"{k}: {round(v, 4):.4f}" for k, v in metrics.items()])
+        )
     return metrics
+
+
+def calc(phase, epoch, all_predicts, all_y, loss):
+    all_predicts = np.array(all_predicts)
+    all_y = np.array(all_y)
+    calc_one(phase, epoch, all_predicts[:, 0], all_y[:, 0], loss, 'Carbon')
+    calc_one(phase, epoch, all_predicts[:, 1], all_y[:, 1], loss, 'Population')
+    return calc_one(phase, epoch, all_predicts, all_y, loss, 'Total')

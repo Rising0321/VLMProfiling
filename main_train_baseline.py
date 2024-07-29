@@ -117,7 +117,7 @@ def main(args):
     model = prepare_model(chkpt_dir, 'mae_vit_large_patch16')
 
     # split the dataset into train and test
-    train_size = int(0.8 * len(image_dataset))
+    train_size = int(0.7 * len(image_dataset))
     test_size = len(image_dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(image_dataset, [train_size, test_size])
     train_dataset = DownStreamDataset(train_dataset, model)
