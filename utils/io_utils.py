@@ -50,14 +50,6 @@ def parse_edgelist_line(line):
 def load_access_street_view(city, value_path):
     temp = os.listdir(f"/home/wangb/OpenVIRL/data/{city_names[city]}")
 
-    # ava_indexs = []
-    #
-    # for item in temp:
-    #     if item.endswith(".graphml"):
-    #         street_views = item.replace(".graphml", ".csv")
-    #         if os.path.exists(
-    #                 f"/home/work/wangb/OpenVIRL/data/streetviews/{city_names[city]}/{value_path}/{street_views}"):
-    #             ava_indexs.append(item)
     return temp
 
 
@@ -205,19 +197,44 @@ def get_graph_and_images_dual(index, city, value_path):
     print_bottom(sub_g, street_views, colors_edge, colors)
     return sub_g, street_views, images
 
+def get_images(index, city):
+    index = int(index)
+    real_root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/"
+    '''
+    # todo : zhushi this line
+    import shutil
+    if os.path.exists(real_root_path):
+        shutil.rmtree(real_root_path)
+    os.makedirs(real_root_path, exist_ok=True)
+    '''
+    root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/images"
+    temp = os.listdir(root_path)
 
-def get_images(index, city, value_path):
-    street_views = index.replace(".edgelist", ".npy")
-    street_views = np.load(
-        f"/home/work/zhangruixing/LLM-Investigator/data/StreetView/{city_names[city]}/{value_path}/{street_views}")
-    images = read_images(street_views, city)
+    images = []
 
-    return street_views, images
+    for idx, item in enumerate(temp):
+        real_path = f"{real_root_path}/{item}"
+        try:
+            if not os.path.exists(real_path):
+                path = f"{root_path}/{item}"
+                image = Image.open(path).convert('RGB')
+                image = image.resize((224, 224))
+                # save image to real_root_path
+                image.save(real_path)
+            else:
+                image = Image.open(real_path).convert('RGB')
+            images.append(image)
+        except Exception as e:
+            print(e)
+            print(real_path, item)
+            continue
 
+    return None, images
 
-def load_task_data(city, value_path):
-    return np.load(f"/home/work/zhangruixing/LLM-Investigator/data/TaskData/{city_names[city]}/{value_path}.npy")
-
+def load_task_data(city):
+    temp1 = np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Carbon.npy")
+    temp2 = np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Population.npy")
+    return [temp1, temp2]
 
 def calc(phase, epoch, all_predicts, all_y, loss):
     metrics = {}
