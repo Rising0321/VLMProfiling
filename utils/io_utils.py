@@ -56,7 +56,7 @@ def load_access_street_view(city, value_path):
 def read_images(street_views, city, index):
     images = {}
     for idx, item in street_views.iterrows():
-        path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/images/{item['id_0']}.jpg"
+        path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/{item['id_0']}.jpg"
         image = Image.open(path).convert('RGB')
         images[int(item['id_0'])] = image  # TODO=
     return images
@@ -197,6 +197,7 @@ def get_graph_and_images_dual(index, city, value_path):
     print_bottom(sub_g, street_views, colors_edge, colors)
     return sub_g, street_views, images
 
+
 def get_images(index, city):
     index = int(index)
     real_root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/"
@@ -231,10 +232,12 @@ def get_images(index, city):
 
     return None, images
 
+
 def load_task_data(city):
     temp1 = np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Carbon.npy")
     temp2 = np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Population.npy")
     return [temp1, temp2]
+
 
 def calc(phase, epoch, all_predicts, all_y, loss):
     metrics = {}
