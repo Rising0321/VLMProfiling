@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 from baselines.MAE import models_vit, models_mae
 from data.datasets import DownStreamDataset
-from utils.io_utils import load_access_street_view, get_images, load_task_data, calc
+from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, transfer_embedding
 
 
 class Linear(nn.Module):
@@ -122,6 +122,8 @@ def main(args):
     chkpt_dir = 'baselines/MAE/mae_pretrain_vit_large.pth'
     model = prepare_model(chkpt_dir, 'mae_vit_large_patch16')
 
+    image_dataset = transfer_embedding(model, image_dataset, args.image_batch_size)
+
     # split the dataset into train and test
     train_size = int(0.7 * len(image_dataset))
     val_size = int(0.8 * len(image_dataset)) - train_size
@@ -172,6 +174,8 @@ def main(args):
     evaluate(model, test_loader, args, "test")
 
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -193,6 +197,13 @@ if __name__ == "__main__":
         "--batch_size",
         type=int,
         default=64,
+        help="batch_size",
+    )
+
+    parser.add_argument(
+        "--image_batch_size",
+        type=int,
+        default=640,
         help="batch_size",
     )
 
