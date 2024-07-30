@@ -3,20 +3,24 @@ import random
 import sys
 import os
 import requests
-
+from torchvision import models
 import torch
 import numpy as np
 
 import matplotlib.pyplot as plt
 from PIL import Image
 import torch.nn as nn
-
-import baselines.MAE.models_mae
 from tqdm import tqdm
 
 from baselines.MAE import models_vit, models_mae
 from data.datasets import DownStreamDataset
 from utils.io_utils import load_access_street_view, get_images, load_task_data, calc
+from transformers import AutoImageProcessor, ResNetForImageClassification
+
+embed_dims = {
+    'MAE': 1024,
+    "ResNet": 2048,
+}
 
 
 class Linear(nn.Module):
@@ -30,24 +34,33 @@ class Linear(nn.Module):
         return logits.squeeze(1)
 
 
-def prepare_model(chkpt_dir, arch='mae_vit_large_patch16'):
+def prepare_model(args):
     # build model
-    model = models_vit.__dict__['vit_large_patch16'](
-        num_classes=1,
-        drop_path_rate=0.1,
-        global_pool=True
-    )
-    # load model
-    checkpoint = torch.load(chkpt_dir, map_location='cpu')
-    msg = model.load_state_dict(checkpoint['model'], strict=False)
-    print(msg)
-    model = model.cuda()
+    model = None
+    if args.model.startswith('MAE'):
+        chkpt_dir = 'baselines/MAE/mae_pretrain_vit_large.pth'
+        model = models_vit.__dict__['vit_large_patch16'](
+            num_classes=1,
+            drop_path_rate=0.1,
+            global_pool=True
+        )
+        # load model
+        checkpoint = torch.load(chkpt_dir, map_location='cpu')
+        msg = model.load_state_dict(checkpoint['model'], strict=False)
+        print(msg)
+        model = model.cuda()
+        processor = None
+    elif args.model.startswith('ResNet'):
+        chkpt_dir = 'baselines/ResNet/'
+        processor = AutoImageProcessor.from_pretrained(chkpt_dir)
+        model = ResNetForImageClassification.from_pretrained(chkpt_dir)
+        model.classifier = torch.nn.Sequential()  # to remove classifier
 
     # freeze all but the head
     for _, p in model.named_parameters():
         p.requires_grad = False
 
-    return model
+    return model, processor
 
 
 def train(model, criterion, optimizer, loader, args, epoch):
@@ -110,7 +123,7 @@ def main(args):
 
     for city in range(4):
         # todo: for test, can repeat the following code with
-        ava_indexs = load_access_street_view(city)[:5]
+        ava_indexs = load_access_street_view(city)[:20]
 
         task_data = load_task_data(city)
 
@@ -119,8 +132,8 @@ def main(args):
             image_dataset.append([images, [task_data[0][int(index)][-1], task_data[1][int(index)][-1]], city])
 
     # load model
-    chkpt_dir = 'baselines/MAE/mae_pretrain_vit_large.pth'
-    model = prepare_model(chkpt_dir, 'mae_vit_large_patch16')
+
+    model, preprocessor = prepare_model(args)
 
     # split the dataset into train and test
     train_size = int(0.7 * len(image_dataset))
@@ -129,16 +142,18 @@ def main(args):
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
 
-    train_dataset = DownStreamDataset(train_dataset, model)
-    val_dataset = DownStreamDataset(val_dataset, model, train_dataset.mean, train_dataset.std)
-    test_dataset = DownStreamDataset(test_dataset, model, train_dataset.mean, train_dataset.std)
+    train_dataset = DownStreamDataset(train_dataset, model, model_name=args.model, preprocessor=preprocessor)
+    val_dataset = DownStreamDataset(val_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
+                                    preprocessor=preprocessor)
+    test_dataset = DownStreamDataset(test_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
+                                     preprocessor=preprocessor)
 
     # data loader
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
-    model = Linear(model.embed_dim).to(args.gpu)
+    model = Linear(embed_dims[args.model]).to(args.gpu)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     criterion = nn.MSELoss()
@@ -185,7 +200,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="MAE",
+        default="ResNet",  # or ResNet
         help="model name",
     )
 
