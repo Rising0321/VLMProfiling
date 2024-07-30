@@ -78,6 +78,7 @@ def prepare_model(args):
     return model, processor
 
 
+
 def train(model, criterion, optimizer, loader, args, epoch, city_size):
     device = torch.device(args.gpu)
     model.train()
