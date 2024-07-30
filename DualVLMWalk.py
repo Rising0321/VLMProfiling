@@ -5,12 +5,7 @@ import random
 
 import matplotlib.pyplot as plt
 
-import numpy as np
-
-from ast import literal_eval
 import re
-
-import math
 
 from tqdm import tqdm
 
@@ -18,8 +13,7 @@ from transformers import AutoModel, AutoTokenizer
 
 import torch
 
-from utils.io_utils import load_access_street_view, get_graph_and_images, get_graph_and_images_dual
-from utils.math_utils import pnt2line, get_dis
+from utils.io_utils import load_access_street_view, get_graph_and_images_dual
 
 import networkx as nx
 

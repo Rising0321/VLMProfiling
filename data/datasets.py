@@ -52,8 +52,15 @@ class DownStreamDataset(Dataset):
                     images = torch.einsum('nhwc->nchw', images).float().cuda()
                     images = (images - images.min()) / (images.max() - images.min())
                     inputs = preprocessor(images, do_rescale=False)
-                    image = model(pixel_values=torch.from_numpy(np.stack(inputs['pixel_values']))).logits.squeeze().cpu().numpy()
+                    image = model(
+                        pixel_values=torch.from_numpy(np.stack(inputs['pixel_values']))).logits.squeeze().cpu().numpy()
                     print(image.shape)  # torch.Size([45, 2048, 1, 1])
+                elif model_name == 'SimCLR':
+                    images = torch.tensor(new_list, dtype=torch.float32)
+                    images = torch.einsum('nhwc->nchw', images).float().cuda()
+                    image, _, _, _ = model(images, images)
+                    image = image.detach().cpu().numpy()
+                    print(image.shape)
             self.imgs.append(image)
             self.labels.append(y)
             self.citys.append(c)

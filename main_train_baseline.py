@@ -1,25 +1,21 @@
 import argparse
-import random
-import sys
 import os
-import requests
-from torchvision import models
 import torch
 import numpy as np
-
-import matplotlib.pyplot as plt
-from PIL import Image
 import torch.nn as nn
 from tqdm import tqdm
 
-from baselines.MAE import models_vit, models_mae
+from baselines.MAE import models_vit
 from data.datasets import DownStreamDataset
 from utils.io_utils import load_access_street_view, get_images, load_task_data, calc
 from transformers import AutoImageProcessor, ResNetForImageClassification
+from simclr import SimCLR
+from simclr.modules import get_resnet
 
 embed_dims = {
     'MAE': 1024,
     "ResNet": 2048,
+    'SimCLR': 2048,
 }
 
 
@@ -55,6 +51,14 @@ def prepare_model(args):
         processor = AutoImageProcessor.from_pretrained(chkpt_dir)
         model = ResNetForImageClassification.from_pretrained(chkpt_dir)
         model.classifier = torch.nn.Sequential()  # to remove classifier
+    elif args.model.startswith('SimCLR'):
+        chkpt_dir = 'baselines/SimCLR/checkpoint_100.tar'
+        encoder = get_resnet('resnet50', pretrained=False)  # don't load a pre-trained model from PyTorch repo
+        n_features = encoder.fc.in_features  # get dimensions of fc layer
+        model = SimCLR(encoder=encoder, projection_dim=64, n_features=n_features)
+        model.load_state_dict(torch.load(chkpt_dir, map_location=torch.device(args.gpu)))
+        model = model.cuda()
+        processor = None
 
     # freeze all but the head
     for _, p in model.named_parameters():
@@ -200,7 +204,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="ResNet",  # or ResNet
+        default="SimCLR",  # MAE or ResNet or SimCLR
         help="model name",
     )
 
