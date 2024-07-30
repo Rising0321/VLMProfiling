@@ -69,6 +69,7 @@ def prepare_model(args):
     return model, processor
 
 
+
 def train(model, criterion, optimizer, loader, args, epoch, city_size):
     device = torch.device(args.gpu)
     model.train()
@@ -214,7 +215,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="MAE",  # or ResNet
+        default="SimCLR",  # or ResNet
         choices=["MAE", "ResNet", "SimCLR"],
         help="model name",
     )
