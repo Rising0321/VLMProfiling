@@ -48,7 +48,7 @@ def parse_edgelist_line(line):
         raise ValueError("Line format is incorrect")
 
 
-def load_access_street_view(city, value_path=None):
+def load_access_street_view(city):
     temp = os.listdir(f"/home/wangb/OpenVIRL/data/{city_names[city]}")
 
     return temp
