@@ -1,4 +1,5 @@
 import re
+import torch
 
 from ast import literal_eval
 from .math_utils import get_dis, pnt2line
@@ -271,3 +272,46 @@ def calc(phase, epoch, all_predicts, all_y, all_city, loss):
         calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: Population')
 
     return calc_one(phase, epoch, all_predicts, all_y, loss, 'Total')
+
+
+imagenet_mean = np.array([0.485, 0.456, 0.406])
+imagenet_std = np.array([0.229, 0.224, 0.225])
+
+
+def norm_image(image):
+    image = image.resize((224, 224))
+    image = np.array(image) / 255.
+
+    assert image.shape == (224, 224, 3)
+
+    # normalize by ImageNet mean and std
+    image = image - imagenet_mean
+    image = image / imagenet_std
+    return image
+
+
+def transfer_embedding(model, image_dataset, image_batch_size):
+    sum_images = []
+    for images, y, c in image_dataset:
+        for image in images:
+            sum_images.append(norm_image(image))
+
+    image_embeddings = []
+
+    from tqdm import tqdm
+
+    model.eval()
+    with torch.no_grad():
+        for i in tqdm(range(0, len(sum_images), image_batch_size)):
+            images = torch.tensor(sum_images[i:min(i + image_batch_size, len(sum_images))], dtype=torch.float32)
+            images = torch.einsum('nhwc->nchw', images).float().cuda()
+            image = model.get_embedding(images).cpu().numpy()
+            image_embeddings.extend(image)
+
+    embeded_images = []
+    pre = 0
+    for images, y, c in image_dataset:
+        embeded_images.append([image_embeddings[pre:pre + len(images)], y, c])
+        pre += len(images)
+
+    return embeded_images
