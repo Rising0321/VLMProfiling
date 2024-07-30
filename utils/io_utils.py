@@ -1,3 +1,5 @@
+# encoding: utf-8
+
 import re
 import torch
 
@@ -258,18 +260,19 @@ def calc_one(phase, epoch, all_predicts, all_y, loss, name):
     return metrics
 
 
-def calc(phase, epoch, all_predicts, all_y, all_city, loss):
+def calc(phase, epoch, all_predicts, all_y, all_city, loss, city_size):
     all_predicts = all_predicts
     all_y = all_y
-    for i in range(4):
+    for i in range(city_size):
         new_predicts = []
         new_y = []
-        for j in range(len(all_city)):
-            if all_city[j] == i:
-                new_predicts.append(all_predicts[j])
-                new_y.append(all_y[j])
-        calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: Carbon')
-        calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: Population')
+        for target in range(2):
+            for j in range(len(all_city)):
+                if all_city[j] == i:
+                    new_predicts.append(all_predicts[j][target])
+                    new_y.append(all_y[j][target])
+            target_name = "Carbon" if target == 0 else "Population"
+            calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: {target_name}')
 
     return calc_one(phase, epoch, all_predicts, all_y, loss, 'Total')
 

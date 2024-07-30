@@ -1,12 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="wangb@10.254.73.179:22" confirmBeforeUploading="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="wangb@10.254.73.179:22 password" confirmBeforeUploading="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
-      <paths name="wangb@10.254.73.179:22">
+      <paths name="wangb@10.254.73.179:22 password">
         <serverdata>
           <mappings>
-            <mapping deploy="/VLMProfiling" local="$PROJECT_DIR$" />
+            <mapping deploy="/home/wangb/zhangrx/LLMInvestrigator" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="zhangrx@10.134.153.63:22 password">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="zhangrx@10.254.9.180:22 agent (4)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="zhangrx@211.71.15.41:22 password">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

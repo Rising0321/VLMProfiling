@@ -46,22 +46,23 @@ class DownStreamDataset(Dataset):
                     images = torch.tensor(new_list, dtype=torch.float32)
                     images = torch.einsum('nhwc->nchw', images).float().cuda()
                     image = model.get_embedding(images).cpu().numpy()
-                    print(image.shape)  # [batch_size,1024]
+                    # print(image.shape)  # [batch_size,1024]
                 elif model_name == 'ResNet':
                     images = torch.tensor(new_list, dtype=torch.float32)
                     images = torch.einsum('nhwc->nchw', images).float().cuda()
                     images = (images - images.min()) / (images.max() - images.min())
                     inputs = preprocessor(images, do_rescale=False)
                     image = model(pixel_values=torch.from_numpy(np.stack(inputs['pixel_values']))).logits.squeeze().cpu().numpy()
-                    print(image.shape)  # torch.Size([45, 2048, 1, 1])
+                    # print(image.shape)  # torch.Size([45, 2048, 1, 1])
             self.imgs.append(image)
             self.labels.append(y)
+            # print(y)
             self.citys.append(c)
 
         if mean is None:
             self.mean = mean = np.mean(self.labels, axis=0)
             self.std = std = np.std(self.labels, axis=0)
-            print(mean, std)
+            # print(mean, std)
 
         self.labels = (self.labels - mean) / std
         self.labels = torch.tensor(self.labels, dtype=torch.float32)

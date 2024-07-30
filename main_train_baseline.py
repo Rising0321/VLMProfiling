@@ -1,3 +1,6 @@
+# encoding: utf-8
+from utilst.io_utils import load_access_street_view, get_images, load_task_data, calc
+
 import argparse
 import random
 import sys
@@ -14,7 +17,6 @@ from tqdm import tqdm
 
 from baselines.MAE import models_vit, models_mae
 from data.datasets import DownStreamDataset
-from utils.io_utils import load_access_street_view, get_images, load_task_data, calc
 from transformers import AutoImageProcessor, ResNetForImageClassification
 
 embed_dims = {
@@ -48,7 +50,7 @@ def prepare_model(args):
         checkpoint = torch.load(chkpt_dir, map_location='cpu')
         msg = model.load_state_dict(checkpoint['model'], strict=False)
         print(msg)
-        model = model.cuda()
+        model = model.to(args.gpu)
         processor = None
     elif args.model.startswith('ResNet'):
         chkpt_dir = 'baselines/ResNet/'
@@ -63,7 +65,7 @@ def prepare_model(args):
     return model, processor
 
 
-def train(model, criterion, optimizer, loader, args, epoch):
+def train(model, criterion, optimizer, loader, args, epoch, city_size):
     device = torch.device(args.gpu)
     model.train()
     all_predictions = []
@@ -88,14 +90,16 @@ def train(model, criterion, optimizer, loader, args, epoch):
         all_truths.extend(y.cpu().detach().numpy())
         all_city.extend(c.cpu().detach().numpy())
 
-    return calc("Train", epoch, all_predictions, all_truths, all_city, total_loss / len(loader))
+    return calc("Train", epoch, all_predictions, all_truths, all_city, total_loss / len(loader), city_size)
 
 
-def evaluate(model, loader, args, epoch):
+def evaluate(model, loader, args, epoch, city_size):
     device = torch.device(args.gpu)
     model.eval()
 
-    all_y, all_predicts, all_city = [], [], []
+    all_predicts = []
+    all_y = []
+    all_city = []
     with torch.no_grad():
         for images, y, c in loader:
             images = images.to(device=device)
@@ -106,10 +110,12 @@ def evaluate(model, loader, args, epoch):
 
             all_y.extend(y.cpu().numpy())
             all_predicts.extend(predicts.cpu().numpy())
+
+            # print(y.shape, predicts.shape, images.shape)
+
             all_city.extend(c.cpu().numpy())
-    all_y = np.concatenate(all_y)
-    all_predicts = np.concatenate(all_predicts)
-    return calc("Eval", epoch, all_predicts, all_y, all_city, None)
+
+    return calc("Eval", epoch, all_predicts, all_y, all_city, None, city_size)
 
 
 def main(args):
@@ -121,9 +127,9 @@ def main(args):
 
     image_dataset = []
 
-    for city in range(4):
+    for city in range(args.city_size):
         # todo: for test, can repeat the following code with
-        ava_indexs = load_access_street_view(city)[:20]
+        ava_indexs = load_access_street_view(city)[:80]
 
         task_data = load_task_data(city)
 
@@ -162,15 +168,18 @@ def main(args):
     best_turn = 0
 
     for epoch in range(args.epoch):
-        train(model, criterion, optimizer, train_loader, args, epoch)
-        cur_metrics = evaluate(model, val_loader, args, epoch)
+        train(model, criterion, optimizer, train_loader, args, epoch, args.city_size)
+        cur_metrics = evaluate(model, val_loader, args, epoch, args.city_size)
         # evaluate(model, test_loader, args, "test")
-        checkpoint_dict = {
-            "epoch": epoch + 1,
-            "state_dict": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-        }
+
         if cur_metrics['mse'] < best_val:
+
+            checkpoint_dict = {
+                "epoch": epoch + 1,
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+            }
+
             torch.save(
                 checkpoint_dict,
                 checkpoints_dir,
@@ -184,10 +193,11 @@ def main(args):
     # load state dict
     checkpoint = torch.load(checkpoints_dir)
     model.load_state_dict(checkpoint['state_dict'])
-    evaluate(model, test_loader, args, "test")
+    evaluate(model, test_loader, args, "test", args.city_size)
 
 
 if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -200,7 +210,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="ResNet",  # or ResNet
+        default="MAE",  # or ResNet
+        choices=["MAE", "ResNet"],
         help="model name",
     )
 
@@ -237,6 +248,13 @@ if __name__ == "__main__":
         type=int,
         default=100,
         help="patience",
+    )
+
+    parser.add_argument(
+        "--city_size",
+        type=int,
+        default=1,
+        help="number of cities",
     )
 
     args = parser.parse_args()
