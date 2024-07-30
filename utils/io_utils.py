@@ -266,7 +266,7 @@ def calc(phase, epoch, all_predicts, all_y, all_city, loss, city_size):
     for i in range(city_size):
         new_predicts = []
         new_y = []
-        for target in range(2):
+        for target in range(1):
             for j in range(len(all_city)):
                 if all_city[j] == i:
                     new_predicts.append(all_predicts[j][target])

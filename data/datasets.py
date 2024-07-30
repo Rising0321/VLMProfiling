@@ -63,6 +63,11 @@ class DownStreamDataset(Dataset):
                     image, _, _, _ = model(images, images)
                     image = image.detach().cpu().numpy()
                     print(image.shape)
+                elif model_name == 'CLIP':
+                    images = torch.tensor(new_list, dtype=torch.float32)
+                    images = torch.einsum('nhwc->nchw', images).float().cuda()
+                    image = model.encode_image(images)
+                    image = image.detach().cpu().numpy()
             self.imgs.append(image)
             self.labels.append(y)
             # print(y)

@@ -13,11 +13,13 @@ from data.datasets import DownStreamDataset
 from transformers import AutoImageProcessor, ResNetForImageClassification
 from simclr import SimCLR
 from simclr.modules import get_resnet
+import open_clip
 
 embed_dims = {
     'MAE': 1024,
     "ResNet": 2048,
     'SimCLR': 2048,
+    'CLIP': 768,
 }
 
 
@@ -60,6 +62,13 @@ def prepare_model(args):
         model = SimCLR(encoder=encoder, projection_dim=64, n_features=n_features)
         model.load_state_dict(torch.load(chkpt_dir, map_location=torch.device(args.gpu)))
         model = model.to(args.gpu)
+        processor = None
+    elif args.model.startswith('CLIP'):
+        chkpt_dir = 'baselines/CLIP/mscoco_finetuned_CoCa-ViT-L-14-laion2B-s13B-b90k/open_clip_pytorch_model.bin'
+        model, _, transform = open_clip.create_model_and_transforms(
+            model_name="coca_ViT-L-14", pretrained=chkpt_dir
+        )
+        model.to(args.gpu)
         processor = None
 
     # freeze all but the head
@@ -133,7 +142,7 @@ def main(args):
 
     for city in range(args.city_size):
         # todo: for test, can repeat the following code with
-        ava_indexs = load_access_street_view(city)[:80]
+        ava_indexs = load_access_street_view(city)[:40]
 
         task_data = load_task_data(city)
 
@@ -214,8 +223,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="MAE",  # or ResNet
-        choices=["MAE", "ResNet", "SimCLR"],
+        default="CLIP",  # or ResNet
+        choices=["MAE", "ResNet", "SimCLR", "CLIP"],
         help="model name",
     )
 
