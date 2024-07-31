@@ -29,7 +29,7 @@ embed_dims = {
 class Linear(nn.Module):
     def __init__(self, embed_dim):
         super().__init__()
-        self.project = nn.Linear(embed_dim, 2)
+        self.project = nn.Linear(embed_dim, 1)
 
     def forward(self, image_latent):
         temp = torch.max(image_latent, 1)[0]

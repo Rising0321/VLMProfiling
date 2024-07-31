@@ -25,13 +25,14 @@ def norm_image(image):
     return image
 
 
-def transfer_image(model, model_name, new_list, preprocessor):
+def transfer_image(model, model_name, image, preprocessor):
     model.eval()
     with torch.no_grad():
         if model_name == "MAE":
-            images = torch.tensor(new_list, dtype=torch.float32)
+            image = norm_image(image)
+            images = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
             images = torch.einsum('nhwc->nchw', images).float().cuda()
-            image = model.get_embedding(images).cpu().numpy()
+            image = model.get_embedding(images).cpu().numpy().squeeze(0)
             # print(image.shape)  # [batch_size,1024]
         elif model_name == 'ResNet':
             images = torch.tensor(new_list, dtype=torch.float32)
@@ -49,10 +50,9 @@ def transfer_image(model, model_name, new_list, preprocessor):
             image = image.detach().cpu().numpy()
             print(image.shape)
         elif model_name == 'CLIP':
-            images = torch.tensor(new_list, dtype=torch.float32)
-            images = torch.einsum('nhwc->nchw', images).float().cuda()
-            image = model.encode_image(images)
-            image = image.detach().cpu().numpy()
+            image = preprocessor(image).unsqueeze(0).cuda()
+            image = model.encode_image(image)
+            image = image.detach().cpu().numpy().squeeze(0)
         elif model_name == "VIT":
             images = torch.tensor(new_list, dtype=torch.float32)
             images = torch.einsum('nhwc->nchw', images).float().cuda()
@@ -71,19 +71,14 @@ class DownStreamDataset(Dataset):
         self.labels = []
         self.citys = []
         for images, y, c in tqdm(dataset):
-            y_1, y_2 = y
-
-            if y_1 < 0 or y_1 > 10000 or y_2 < 0 or y_2 > 10000:
+            if y < 0 or y > 10000:
                 continue
 
             new_list = []
             for image in images:
-                new_list.append(norm_image(image))
+                new_list.append(new_list(model, model_name, image, preprocessor))
 
-            # todo: normalize the image
-            images = transfer_image(model, model_name, new_list, preprocessor)
-
-            self.imgs.append(images)
+            self.imgs.append(new_list)
             self.labels.append(y)
             # print(y)
             self.citys.append(c)
@@ -115,19 +110,14 @@ class ImageryDataset(Dataset):
         self.labels = []
         self.citys = []
         for image, y, c in tqdm(dataset):
-            y_1, y_2 = y
-
-            if y_1 < 0 or y_1 > 10000 or y_2 < 0 or y_2 > 10000:
+            if y < 0 or y > 10000:
                 continue
 
-            image = norm_image(image)
-
-            image = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
-
-            image = transfer_image(model, model_name, image, preprocessor).reshape([-1])
+            image = transfer_image(model, model_name, image, preprocessor)
 
             self.imgs.append(image)
             self.labels.append(y)
+
             # print(y)
             self.citys.append(c)
 

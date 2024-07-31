@@ -29,7 +29,8 @@ embed_dims = {
 class Linear(nn.Module):
     def __init__(self, embed_dim):
         super().__init__()
-        self.project = nn.Linear(embed_dim, 2)
+        self.project = nn.Linear(embed_dim, 1)
+        self.act = nn.GELU()
 
     def forward(self, image_latent):
         logits = self.project(image_latent)
@@ -73,7 +74,7 @@ def prepare_model(args):
             model_name="coca_ViT-L-14", pretrained=chkpt_dir
         )
         model.to(args.gpu)
-        processor = None
+        processor = transform
     elif args.model.startswith('VIT'):
         chkpt_dir = 'baselines/ViT'
         processor = ViTImageProcessor.from_pretrained(chkpt_dir)
@@ -111,7 +112,7 @@ def train(model, criterion, optimizer, loader, args, epoch, city_size):
         all_truths.extend(y.cpu().detach().numpy())
         all_city.extend(c.cpu().detach().numpy())
 
-    return calc("Train", epoch, all_predictions, all_truths, all_city, total_loss / len(loader), city_size)
+    return calc("Train", epoch, all_predictions, all_truths, all_city, total_loss / len(loader), city_size, args.target)
 
 
 def evaluate(model, loader, args, epoch, city_size):
@@ -136,7 +137,7 @@ def evaluate(model, loader, args, epoch, city_size):
 
             all_city.extend(c.cpu().numpy())
 
-    return calc("Eval", epoch, all_predicts, all_y, all_city, None, city_size)
+    return calc("Eval", epoch, all_predicts, all_y, all_city, None, city_size, args.target)
 
 
 def main(args):
@@ -151,15 +152,15 @@ def main(args):
 
     image_dataset = []
 
-    for city in range(args.city_size):
-        # todo: for test, can repeat the following code with
-        ava_indexs = load_access_street_view(city)
+    city = args.city_size
+    # todo: for test, can repeat the following code with
 
-        task_data = load_task_data(city)
+    ava_indexs = load_access_street_view(city)
 
-        for index in tqdm(ava_indexs):
-            _, images = get_imagery(index, city)
-            image_dataset.append([images, [task_data[0][int(index)][-1], task_data[1][int(index)][-1]], city])
+    task_data = load_task_data(city, args.target)
+    for index in tqdm(ava_indexs):
+        _, images = get_imagery(index, city)
+        image_dataset.append([images, task_data[int(index)][-1], city])
 
     # load model
 
@@ -169,14 +170,16 @@ def main(args):
     train_size = int(0.7 * len(image_dataset))
     val_size = int(0.8 * len(image_dataset)) - train_size
     test_size = len(image_dataset) - train_size - val_size
+    print(train_size, val_size, test_size)
+
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
 
     train_dataset = ImageryDataset(train_dataset, model, model_name=args.model, preprocessor=preprocessor)
     val_dataset = ImageryDataset(val_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
-                                    preprocessor=preprocessor)
+                                 preprocessor=preprocessor)
     test_dataset = ImageryDataset(test_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
-                                     preprocessor=preprocessor)
+                                  preprocessor=preprocessor)
 
     # data loader
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
@@ -188,15 +191,16 @@ def main(args):
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     criterion = nn.MSELoss()
 
-    best_val = 123456789
+    best_val = -123456789
     best_turn = 0
 
     for epoch in range(args.epoch):
         train(model, criterion, optimizer, train_loader, args, epoch, args.city_size)
         cur_metrics = evaluate(model, val_loader, args, epoch, args.city_size)
+        evaluate(model, test_loader, args, epoch, args.city_size)
         # evaluate(model, test_loader, args, "test")
 
-        if cur_metrics['mse'] < best_val:
+        if cur_metrics['r2'] > best_val:
 
             checkpoint_dict = {
                 "epoch": epoch + 1,
@@ -208,7 +212,8 @@ def main(args):
                 checkpoint_dict,
                 checkpoints_dir,
             )
-            best_val = cur_metrics['mse']
+            best_val = cur_metrics['r2']
+            print("best:", best_val)
             best_turn = 0
         else:
             best_turn += 1
@@ -242,7 +247,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=64,
+        default=512,
         help="batch_size",
     )
 
@@ -263,7 +268,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr",
         type=float,
-        default=1e-4,
+        default=1e-3,
         help="lr",
     )
     # huggingface-cli download --resume-download google/vit-base-patch16-224-in21k --local-dir ./vit-base-patch16-224-in21k
@@ -277,8 +282,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--city_size",
         type=int,
-        default=1,
+        default=3,
         help="number of cities",
+    )
+
+    parser.add_argument(
+        "--target",
+        type=int,
+        default=0,
+        help="Carbon or Population",
     )
 
     parser.add_argument(

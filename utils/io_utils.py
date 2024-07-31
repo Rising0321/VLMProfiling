@@ -235,6 +235,7 @@ def get_images(index, city):
 
     return None, images
 
+
 def get_imagery(index, city):
     index = int(index)
     real_root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/"
@@ -251,10 +252,12 @@ def get_imagery(index, city):
 
     return None, image
 
-def load_task_data(city):
-    temp1 = np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Carbon.npy")
-    temp2 = np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Population.npy")
-    return [temp1, temp2]
+
+def load_task_data(city, target):
+    if target == 0:
+        return np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Carbon.npy")
+    else:
+        return np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Population.npy")
 
 
 def calc_one(phase, epoch, all_predicts, all_y, loss, name):
@@ -266,6 +269,7 @@ def calc_one(phase, epoch, all_predicts, all_y, loss, name):
     metrics["rmse"] = np.sqrt(metrics["mse"])
     metrics["mae"] = mean_absolute_error(all_y, all_predicts)
     metrics["mape"] = mean_absolute_percentage_error(all_y, all_predicts)
+    metrics["pcc"] = np.corrcoef(all_y, all_predicts)[0, 1]
 
     if name != "Total":
         print(
@@ -275,19 +279,19 @@ def calc_one(phase, epoch, all_predicts, all_y, loss, name):
     return metrics
 
 
-def calc(phase, epoch, all_predicts, all_y, all_city, loss, city_size):
+def calc(phase, epoch, all_predicts, all_y, all_city, loss, city_size, target):
     all_predicts = all_predicts
     all_y = all_y
-    for i in range(city_size):
-        new_predicts = []
-        new_y = []
-        for target in range(1):
-            for j in range(len(all_city)):
-                if all_city[j] == i:
-                    new_predicts.append(all_predicts[j][target])
-                    new_y.append(all_y[j][target])
-            target_name = "Carbon" if target == 0 else "Population"
-            calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: {target_name}')
+    i = city_size
+    new_predicts = []
+    new_y = []
+
+    for j in range(len(all_city)):
+        if all_city[j] == i:
+            new_predicts.append(all_predicts[j])
+            new_y.append(all_y[j])
+    target_name = "Carbon" if target == 0 else "Population"
+    calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: {target_name}')
 
     return calc_one(phase, epoch, all_predicts, all_y, loss, 'Total')
 
@@ -298,4 +302,3 @@ def init_seed(seed):
     np.random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
