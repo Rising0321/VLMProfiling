@@ -13,7 +13,6 @@ imagenet_std = np.array([0.229, 0.224, 0.225])
 
 
 def norm_image(image):
-    image = image.resize((224, 224))
     image = np.array(image) / 255.
 
     assert image.shape == (224, 224, 3)
@@ -39,7 +38,7 @@ class DownStreamDataset(Dataset):
             new_list = []
             for image in images:
                 new_list.append(norm_image(image))
-
+            # todo: normalize the image
             model.eval()
             with torch.no_grad():
                 if model_name == "MAE":
@@ -52,7 +51,6 @@ class DownStreamDataset(Dataset):
                     images = torch.einsum('nhwc->nchw', images).float().cuda()
                     images = (images - images.min()) / (images.max() - images.min())
                     inputs = preprocessor(images, do_rescale=False)
-                    image = model(pixel_values=torch.from_numpy(np.stack(inputs['pixel_values']))).logits.squeeze().cpu().numpy()
                     # print(image.shape)  # torch.Size([45, 2048, 1, 1])
                     image = model(
                         pixel_values=torch.from_numpy(np.stack(inputs['pixel_values']))).logits.squeeze().cpu().numpy()
@@ -68,6 +66,14 @@ class DownStreamDataset(Dataset):
                     images = torch.einsum('nhwc->nchw', images).float().cuda()
                     image = model.encode_image(images)
                     image = image.detach().cpu().numpy()
+                elif model_name == "VIT":
+                    images = torch.tensor(new_list, dtype=torch.float32)
+                    images = torch.einsum('nhwc->nchw', images).float().cuda()
+                    images = (images - images.min()) / (images.max() - images.min())
+                    images = preprocessor(images=images, return_tensors="pt")
+                    image = model(**images)
+                    image = image.last_hidden_state[:, 0, :].detach().cpu().numpy()
+                    print(image.shape)
             self.imgs.append(image)
             self.labels.append(y)
             # print(y)

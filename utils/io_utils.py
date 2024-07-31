@@ -275,3 +275,12 @@ def calc(phase, epoch, all_predicts, all_y, all_city, loss, city_size):
             calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: {target_name}')
 
     return calc_one(phase, epoch, all_predicts, all_y, loss, 'Total')
+
+
+def init_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+

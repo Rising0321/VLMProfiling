@@ -1,5 +1,5 @@
 # encoding: utf-8
-from utils.io_utils import load_access_street_view, get_images, load_task_data, calc
+from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed
 
 import argparse
 import os
@@ -11,6 +11,8 @@ from tqdm import tqdm
 from baselines.MAE import models_vit
 from data.datasets import DownStreamDataset
 from transformers import AutoImageProcessor, ResNetForImageClassification
+from transformers import ViTImageProcessor, ViTModel
+
 from simclr import SimCLR
 from simclr.modules import get_resnet
 import open_clip
@@ -20,6 +22,7 @@ embed_dims = {
     "ResNet": 2048,
     'SimCLR': 2048,
     'CLIP': 768,
+    "VIT": 768
 }
 
 
@@ -37,6 +40,8 @@ class Linear(nn.Module):
 def prepare_model(args):
     # build model
     model = None
+    processor = None
+
     if args.model.startswith('MAE'):
         chkpt_dir = 'baselines/MAE/mae_pretrain_vit_large.pth'
         model = models_vit.__dict__['vit_large_patch16'](
@@ -70,13 +75,16 @@ def prepare_model(args):
         )
         model.to(args.gpu)
         processor = None
+    elif args.model.startswith('VIT'):
+        chkpt_dir = 'baselines/ViT'
+        processor = ViTImageProcessor.from_pretrained(chkpt_dir)
+        model = ViTModel.from_pretrained(chkpt_dir)
 
     # freeze all but the head
     for _, p in model.named_parameters():
         p.requires_grad = False
 
     return model, processor
-
 
 
 def train(model, criterion, optimizer, loader, args, epoch, city_size):
@@ -135,6 +143,9 @@ def evaluate(model, loader, args, epoch, city_size):
 def main(args):
     # pip install timm==0.3.2
     # todo: change timm to 1.0.7
+
+    init_seed(args.seed)
+
     os.makedirs(f"./log/{args.model}", exist_ok=True)
     checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
     os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
@@ -224,8 +235,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="CLIP",  # or ResNet
-        choices=["MAE", "ResNet", "SimCLR", "CLIP"],
+        default="VIT",  # or ResNet
+        choices=["MAE", "ResNet", "SimCLR", "CLIP", "VIT"],
         help="model name",
     )
 
@@ -256,7 +267,7 @@ if __name__ == "__main__":
         default=1e-3,
         help="lr",
     )
-
+    # huggingface-cli download --resume-download google/vit-base-patch16-224-in21k --local-dir ./vit-base-patch16-224-in21k
     parser.add_argument(
         "--patience",
         type=int,
@@ -269,6 +280,13 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="number of cities",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="seed",
     )
 
     args = parser.parse_args()
