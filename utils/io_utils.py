@@ -235,6 +235,21 @@ def get_images(index, city):
 
     return None, images
 
+def get_imagery(index, city):
+    index = int(index)
+    real_root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/"
+    '''
+    # todo : zhushi this line
+    import shutil
+    if os.path.exists(real_root_path):
+        shutil.rmtree(real_root_path)
+    os.makedirs(real_root_path, exist_ok=True)
+    '''
+    root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite.tif"
+
+    image = Image.open(root_path).convert('RGB')
+
+    return None, image
 
 def load_task_data(city):
     temp1 = np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Carbon.npy")

@@ -1,5 +1,5 @@
 # encoding: utf-8
-from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed
+from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed, get_imagery
 
 import argparse
 import os
@@ -9,7 +9,7 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from baselines.MAE import models_vit
-from data.datasets import DownStreamDataset
+from data.datasets import DownStreamDataset, ImageryDataset
 from transformers import AutoImageProcessor, ResNetForImageClassification
 from transformers import ViTImageProcessor, ViTModel
 
@@ -32,8 +32,7 @@ class Linear(nn.Module):
         self.project = nn.Linear(embed_dim, 2)
 
     def forward(self, image_latent):
-        temp = torch.max(image_latent, 1)[0]
-        logits = self.project(temp)
+        logits = self.project(image_latent)
         return logits.squeeze(1)
 
 
@@ -154,12 +153,12 @@ def main(args):
 
     for city in range(args.city_size):
         # todo: for test, can repeat the following code with
-        ava_indexs = load_access_street_view(city)[:40]
+        ava_indexs = load_access_street_view(city)
 
         task_data = load_task_data(city)
 
         for index in tqdm(ava_indexs):
-            street_views, images = get_images(index, city)
+            _, images = get_imagery(index, city)
             image_dataset.append([images, [task_data[0][int(index)][-1], task_data[1][int(index)][-1]], city])
 
     # load model
@@ -173,10 +172,10 @@ def main(args):
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
 
-    train_dataset = DownStreamDataset(train_dataset, model, model_name=args.model, preprocessor=preprocessor)
-    val_dataset = DownStreamDataset(val_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
+    train_dataset = ImageryDataset(train_dataset, model, model_name=args.model, preprocessor=preprocessor)
+    val_dataset = ImageryDataset(val_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
                                     preprocessor=preprocessor)
-    test_dataset = DownStreamDataset(test_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
+    test_dataset = ImageryDataset(test_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
                                      preprocessor=preprocessor)
 
     # data loader
@@ -264,7 +263,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr",
         type=float,
-        default=1e-3,
+        default=1e-4,
         help="lr",
     )
     # huggingface-cli download --resume-download google/vit-base-patch16-224-in21k --local-dir ./vit-base-patch16-224-in21k
@@ -278,7 +277,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--city_size",
         type=int,
-        default=2,
+        default=1,
         help="number of cities",
     )
 
