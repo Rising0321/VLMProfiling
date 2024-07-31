@@ -7,6 +7,7 @@ import os
 from tqdm import tqdm
 import numpy as np
 from tqdm import tqdm
+from torchvision import transforms
 
 imagenet_mean = np.array([0.485, 0.456, 0.406])
 imagenet_std = np.array([0.229, 0.224, 0.225])
@@ -27,40 +28,40 @@ def norm_image(image):
 
 def transfer_image(model, model_name, image, preprocessor):
     model.eval()
+    trans = transforms.ToTensor()
     with torch.no_grad():
         if model_name == "MAE":
             image = norm_image(image)
             images = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
             images = torch.einsum('nhwc->nchw', images).float().cuda()
             image = model.get_embedding(images).cpu().numpy().squeeze(0)
-            # print(image.shape)  # [batch_size,1024]
+            # print(image.shape)  # [1024, ]
         elif model_name == 'ResNet':
-            images = torch.tensor(new_list, dtype=torch.float32)
-            images = torch.einsum('nhwc->nchw', images).float().cuda()
-            images = (images - images.min()) / (images.max() - images.min())
-            inputs = preprocessor(images, do_rescale=False)
+            image = trans(image)
+            image = torch.tensor(image, dtype=torch.float32).unsqueeze(0).cuda()
+            inputs = preprocessor(image, do_rescale=False)
             # print(image.shape)  # torch.Size([45, 2048, 1, 1])
             image = model(
                 pixel_values=torch.from_numpy(np.stack(inputs['pixel_values']))).logits.squeeze().cpu().numpy()
-            print(image.shape)  # torch.Size([45, 2048, 1, 1])
+            # print(image.shape)  # [2048, ]
         elif model_name == 'SimCLR':
-            images = torch.tensor(new_list, dtype=torch.float32)
-            images = torch.einsum('nhwc->nchw', images).float().cuda()
-            image, _, _, _ = model(images, images)
-            image = image.detach().cpu().numpy()
-            print(image.shape)
+            image = trans(image)
+            image = torch.tensor(image, dtype=torch.float32).unsqueeze(0).cuda()
+            image, _, _, _ = model(image, image)
+            image = image.detach().cpu().numpy().squeeze(0)
+            # print(image.shape)
         elif model_name == 'CLIP':
             image = preprocessor(image).unsqueeze(0).cuda()
             image = model.encode_image(image)
             image = image.detach().cpu().numpy().squeeze(0)
-        elif model_name == "VIT":
-            images = torch.tensor(new_list, dtype=torch.float32)
-            images = torch.einsum('nhwc->nchw', images).float().cuda()
-            images = (images - images.min()) / (images.max() - images.min())
-            images = preprocessor(images=images, return_tensors="pt")
-            image = model(**images)
-            image = image.last_hidden_state[:, 0, :].detach().cpu().numpy()
-            print(image.shape)
+        elif model_name == "ViT":
+            image = trans(image)
+            image = torch.tensor(image, dtype=torch.float32).unsqueeze(0).cuda()
+            # image = (image - image.min()) / (image.max() - image.min())
+            image = preprocessor(images=image, return_tensors="pt", do_rescale=False)
+            image = model(**image)
+            image = image.last_hidden_state[:, 0, :].detach().cpu().numpy().squeeze(0)
+            # print(image.shape) # [768, 0]
     return image
 
 

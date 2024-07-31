@@ -22,7 +22,7 @@ embed_dims = {
     "ResNet": 2048,
     'SimCLR': 2048,
     'CLIP': 768,
-    "VIT": 768
+    "ViT": 768
 }
 
 
@@ -75,7 +75,7 @@ def prepare_model(args):
         )
         model.to(args.gpu)
         processor = None
-    elif args.model.startswith('VIT'):
+    elif args.model.startswith('ViT'):
         chkpt_dir = 'baselines/ViT'
         processor = ViTImageProcessor.from_pretrained(chkpt_dir)
         model = ViTModel.from_pretrained(chkpt_dir)
@@ -236,7 +236,7 @@ if __name__ == "__main__":
         "--model",
         type=str,
         default="MAE",  # or ResNet
-        choices=["MAE", "ResNet", "SimCLR", "CLIP", "VIT"],
+        choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
 

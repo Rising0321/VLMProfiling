@@ -258,7 +258,7 @@ if __name__ == "__main__":
 
     os.makedirs(f"./log/{args.model}", exist_ok=True)
 
-    ava_indexs = load_access_street_view(args.city, args.value_path)
+    ava_indexs = load_access_street_view(args.city)
     model, tokenizer = get_model(args)
     for index in tqdm(ava_indexs):
         if int(index) == 14:
