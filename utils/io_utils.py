@@ -1,5 +1,5 @@
 # encoding: utf-8
-
+import logging
 import re
 import torch
 
@@ -260,6 +260,22 @@ def load_task_data(city, target):
         return np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Population.npy")
 
 
+from loguru import logger
+
+
+def init_logging(args):
+    os.makedirs(f"./logs/{args.model}", exist_ok=True)
+    logger.remove(handler_id=None)  # remove default logger
+    file_name = f"{args.model}-{args.city_size}-{args.target}-{args.seed}-{args.lr}.log"
+    logger.add(os.path.join("./logs", file_name), level="INFO")
+    logger.info(args)
+
+
+def log_result(str):
+    logger.info(str)
+    print(str)
+
+
 def calc_one(phase, epoch, all_predicts, all_y, loss, name):
     metrics = {}
     if loss is not None:
@@ -272,10 +288,11 @@ def calc_one(phase, epoch, all_predicts, all_y, loss, name):
     metrics["pcc"] = np.corrcoef(all_y, all_predicts)[0, 1]
 
     if name != "Total":
-        print(
+        log_result(
             f"{name}: {phase} Epoch: {epoch} "
             + "\t".join([f"{k}: {round(v, 4):.4f}" for k, v in metrics.items()])
         )
+
     return metrics
 
 

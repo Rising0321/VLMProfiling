@@ -1,5 +1,6 @@
 # encoding: utf-8
-from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed, get_imagery
+from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed, get_imagery, \
+    init_logging
 
 import argparse
 import os
@@ -146,7 +147,8 @@ def main(args):
 
     init_seed(args.seed)
 
-    os.makedirs(f"./log/{args.model}", exist_ok=True)
+    init_logging(args)
+
     checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
     os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
 
