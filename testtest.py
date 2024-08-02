@@ -6,6 +6,13 @@ targets = [0, 1]
 lrs = [1e-3, 1e-4, 1e-5, 5e-4, 5e-5]
 # excute python main_train_imagery.py --model {model} --city_size {city} --target {target}
 
+for city in cities:
+    for model in models:
+        os.system(
+            f"/home/wangb/.conda/envs/llm/bin/python main_train_baseline.py --city_size {city} --model {model}")
+
+exit(0)
+
 for model in models:
     for city in cities:
         for target in targets:

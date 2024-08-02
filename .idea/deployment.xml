@@ -10,6 +10,20 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="zhangrx@10.134.133.198:32101 password">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="zhangrx@10.134.133.198:32101 password (2)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="zhangrx@10.134.153.63:22 password">
         <serverdata>
           <mappings>

@@ -159,14 +159,12 @@ def main(args):
 
     ava_indexs = load_access_street_view(city)
 
+    model, preprocessor = prepare_model(args)
+
     task_data = load_task_data(city, args.target)
     for index in tqdm(ava_indexs):
-        _, images = get_imagery(index, city)
+        _, images = get_imagery(index, city, args.model, model, preprocessor)
         image_dataset.append([images, task_data[int(index)][-1], city])
-
-    # load model
-
-    model, preprocessor = prepare_model(args)
 
     # split the dataset into train and test
     train_size = int(0.7 * len(image_dataset))
@@ -273,6 +271,7 @@ if __name__ == "__main__":
         default=1e-3,
         help="lr",
     )
+
     # huggingface-cli download --resume-download google/vit-base-patch16-224-in21k --local-dir ./vit-base-patch16-224-in21k
     parser.add_argument(
         "--patience",

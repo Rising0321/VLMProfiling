@@ -16,6 +16,7 @@ import networkx as nx
 import pyproj
 import mercantile
 import pandas as pd
+from torchvision import transforms
 
 from sklearn.metrics import (
     r2_score,
@@ -201,24 +202,80 @@ def get_graph_and_images_dual(index, city, value_path):
     return sub_g, street_views, images
 
 
-def get_images(index, city):
+imagenet_mean = np.array([0.485, 0.456, 0.406])
+imagenet_std = np.array([0.229, 0.224, 0.225])
+
+
+def norm_image(image):
+    image = image.resize((224, 224))
+
+    image = np.array(image) / 255.
+
+    assert image.shape == (224, 224, 3)
+
+    # normalize by ImageNet mean and std
+    image = image - imagenet_mean
+    image = image / imagenet_std
+    return image
+
+
+def transfer_image(model, model_name, image, preprocessor):
+    model.eval()
+    trans = transforms.ToTensor()
+    with torch.no_grad():
+        if model_name == "MAE":
+            image = norm_image(image)
+            images = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
+            images = torch.einsum('nhwc->nchw', images).float().cuda()
+            image = model.get_embedding(images).cpu().numpy().squeeze(0)
+            # print(image.shape)  # [1024, ]
+        elif model_name == 'ResNet':
+            image = trans(image)
+            image = torch.tensor(image, dtype=torch.float32).unsqueeze(0).cuda()
+            inputs = preprocessor(image, do_rescale=False)
+            # print(image.shape)  # torch.Size([45, 2048, 1, 1])
+            image = model(
+                pixel_values=torch.from_numpy(np.stack(inputs['pixel_values']))).logits.squeeze().cpu().numpy()
+            # print(image.shape)  # [2048, ]
+        elif model_name == 'SimCLR':
+            image = trans(image)
+            image = torch.tensor(image, dtype=torch.float32).unsqueeze(0).cuda()
+            image, _, _, _ = model(image, image)
+            image = image.detach().cpu().numpy().squeeze(0)
+            # print(image.shape)
+        elif model_name == 'CLIP':
+            image = preprocessor(image).unsqueeze(0).cuda()
+            image = model.encode_image(image)
+            image = image.detach().cpu().numpy().squeeze(0)
+        elif model_name == "ViT":
+            image = trans(image)
+            image = torch.tensor(image, dtype=torch.float32).unsqueeze(0).cuda()
+            # image = (image - image.min()) / (image.max() - image.min())
+            image = preprocessor(images=image, return_tensors="pt", do_rescale=False)
+            image = model(**image)
+            image = image.last_hidden_state[:, 0, :].detach().cpu().numpy().squeeze(0)
+            # print(image.shape) # [768, 0]
+    return image
+
+
+def get_images(index, city, model_name, model, preprocessor):
     index = int(index)
-    real_root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/"
-    '''
-    # todo : zhushi this line
-    import shutil
-    if os.path.exists(real_root_path):
-        shutil.rmtree(real_root_path)
-    os.makedirs(real_root_path, exist_ok=True)
-    '''
+
+    real_root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images"
+
     root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/images"
+
+    embedding_dir = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/image_embeddings"
+
+    os.makedirs(embedding_dir, exist_ok=True)
+
     temp = os.listdir(root_path)
 
     images = []
 
     for idx, item in enumerate(temp):
-        real_path = f"{real_root_path}/{item}"
         try:
+            real_path = f"{real_root_path}/{item}"
             if not os.path.exists(real_path):
                 path = f"{root_path}/{item}"
                 image = Image.open(path).convert('RGB')
@@ -227,30 +284,49 @@ def get_images(index, city):
                 image.save(real_path)
             else:
                 image = Image.open(real_path).convert('RGB')
-            images.append(image)
         except Exception as e:
             print(e)
             print(real_path, item)
             continue
 
+        item_name = item.replace(".jpg", "")
+
+        embed_path = f"{embedding_dir}/{item_name}-{model_name}.npy"
+        if not os.path.exists(embed_path):
+            embedding = transfer_image(model, model_name, image, preprocessor)
+            np.save(embed_path, embedding)
+        else:
+            embedding = np.load(embed_path)
+        images.append(embedding)
+
     return None, images
 
 
-def get_imagery(index, city):
+'''
+# todo : zhushi this line
+import shutil
+if os.path.exists(real_root_path):
+    shutil.rmtree(real_root_path)
+os.makedirs(real_root_path, exist_ok=True)
+'''
+
+
+def get_imagery(index, city, model_name, model, preprocessor):
     index = int(index)
-    real_root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/"
-    '''
-    # todo : zhushi this line
-    import shutil
-    if os.path.exists(real_root_path):
-        shutil.rmtree(real_root_path)
-    os.makedirs(real_root_path, exist_ok=True)
-    '''
+
     root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite.tif"
 
-    image = Image.open(root_path).convert('RGB')
+    embeding_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite_embedding_{model_name}.npy"
 
-    return None, image
+    if not os.path.exists(embeding_path):
+        image = Image.open(root_path).convert('RGB')
+        image = image.resize((224, 224))
+        embedding = transfer_image(model, model_name, image, preprocessor)
+        np.save(embeding_path, embedding)
+    else:
+        embedding = np.load(embeding_path)
+
+    return None, embedding
 
 
 def load_task_data(city, target):

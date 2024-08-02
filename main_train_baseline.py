@@ -1,5 +1,5 @@
 # encoding: utf-8
-from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed
+from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed, init_logging
 
 import argparse
 import os
@@ -32,6 +32,7 @@ class Linear(nn.Module):
         self.project = nn.Linear(embed_dim, 1)
 
     def forward(self, image_latent):
+
         temp = torch.max(image_latent, 1)[0]
         logits = self.project(temp)
         return logits.squeeze(1)
@@ -74,7 +75,7 @@ def prepare_model(args):
             model_name="coca_ViT-L-14", pretrained=chkpt_dir
         )
         model.to(args.gpu)
-        processor = None
+        processor = transform
     elif args.model.startswith('ViT'):
         chkpt_dir = 'baselines/ViT'
         processor = ViTImageProcessor.from_pretrained(chkpt_dir)
@@ -112,7 +113,7 @@ def train(model, criterion, optimizer, loader, args, epoch, city_size):
         all_truths.extend(y.cpu().detach().numpy())
         all_city.extend(c.cpu().detach().numpy())
 
-    return calc("Train", epoch, all_predictions, all_truths, all_city, total_loss / len(loader), city_size)
+    return calc("Train", epoch, all_predictions, all_truths, all_city, total_loss / len(loader), city_size, args.target)
 
 
 def evaluate(model, loader, args, epoch, city_size):
@@ -137,7 +138,7 @@ def evaluate(model, loader, args, epoch, city_size):
 
             all_city.extend(c.cpu().numpy())
 
-    return calc("Eval", epoch, all_predicts, all_y, all_city, None, city_size)
+    return calc("Eval", epoch, all_predicts, all_y, all_city, None, city_size, args.target)
 
 
 def main(args):
@@ -146,30 +147,31 @@ def main(args):
 
     init_seed(args.seed)
 
-    os.makedirs(f"./log/{args.model}", exist_ok=True)
+    init_logging(args)
+
     checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
     os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
 
     image_dataset = []
 
-    for city in range(args.city_size):
-        # todo: for test, can repeat the following code with
-        ava_indexs = load_access_street_view(city)[:40]
+    city = args.city_size
 
-        task_data = load_task_data(city)
+    # todo: for test, can repeat the following code with
+    ava_indexs = load_access_street_view(city)
 
-        for index in tqdm(ava_indexs):
-            street_views, images = get_images(index, city)
-            image_dataset.append([images, [task_data[0][int(index)][-1], task_data[1][int(index)][-1]], city])
-
-    # load model
+    task_data = load_task_data(city, args.target)
 
     model, preprocessor = prepare_model(args)
+
+    for index in tqdm(ava_indexs):
+        _, images = get_images(index, city, args.model, model, preprocessor)
+        image_dataset.append([images, task_data[int(index)][-1], city])
 
     # split the dataset into train and test
     train_size = int(0.7 * len(image_dataset))
     val_size = int(0.8 * len(image_dataset)) - train_size
     test_size = len(image_dataset) - train_size - val_size
+
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
 
@@ -189,7 +191,7 @@ def main(args):
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     criterion = nn.MSELoss()
 
-    best_val = 123456789
+    best_val = -123456789
     best_turn = 0
 
     for epoch in range(args.epoch):
@@ -197,7 +199,7 @@ def main(args):
         cur_metrics = evaluate(model, val_loader, args, epoch, args.city_size)
         # evaluate(model, test_loader, args, "test")
 
-        if cur_metrics['mse'] < best_val:
+        if cur_metrics['r2'] > best_val:
 
             checkpoint_dict = {
                 "epoch": epoch + 1,
@@ -209,7 +211,7 @@ def main(args):
                 checkpoint_dict,
                 checkpoints_dir,
             )
-            best_val = cur_metrics['mse']
+            best_val = cur_metrics['r2']
             best_turn = 0
         else:
             best_turn += 1
@@ -235,7 +237,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="MAE",  # or ResNet
+        default="ResNet",
         choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
@@ -243,7 +245,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=64,
+        default=512,
         help="batch_size",
     )
 
@@ -267,6 +269,7 @@ if __name__ == "__main__":
         default=1e-3,
         help="lr",
     )
+
     # huggingface-cli download --resume-download google/vit-base-patch16-224-in21k --local-dir ./vit-base-patch16-224-in21k
     parser.add_argument(
         "--patience",
@@ -278,8 +281,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--city_size",
         type=int,
-        default=2,
+        default=3,
         help="number of cities",
+    )
+
+    parser.add_argument(
+        "--target",
+        type=int,
+        default=1,
+        help="Carbon or Population",
     )
 
     parser.add_argument(

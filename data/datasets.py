@@ -75,9 +75,10 @@ class DownStreamDataset(Dataset):
             if y < 0 or y > 10000:
                 continue
 
-            new_list = []
-            for image in images:
-                new_list.append(new_list(model, model_name, image, preprocessor))
+            if len(images) < 10:
+                continue
+
+            new_list = torch.tensor(np.stack(images))
 
             self.imgs.append(new_list)
             self.labels.append(y)
@@ -97,11 +98,12 @@ class DownStreamDataset(Dataset):
         return len(self.imgs)
 
     def __getitem__(self, index):
+        # random select 10 images from self.img[index]
         imgs = self.imgs[index]
-        random.shuffle(imgs)
-        imgs = imgs[:10]
-        labels = self.labels[index]
-        return torch.tensor(imgs), labels, self.citys[index]
+        indexs = random.sample(range(len(imgs)), 10)
+        imgs = imgs[indexs]
+
+        return imgs, self.labels[index], self.citys[index]
 
 
 class ImageryDataset(Dataset):
@@ -114,7 +116,7 @@ class ImageryDataset(Dataset):
             if y < 0 or y > 10000:
                 continue
 
-            image = transfer_image(model, model_name, image, preprocessor)
+            image = torch.tensor(image)
 
             self.imgs.append(image)
             self.labels.append(y)
@@ -135,4 +137,4 @@ class ImageryDataset(Dataset):
         return len(self.imgs)
 
     def __getitem__(self, index):
-        return torch.tensor(self.imgs[index]), self.labels[index], self.citys[index]
+        return self.imgs[index], self.labels[index], self.citys[index]
