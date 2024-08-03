@@ -32,7 +32,6 @@ class Linear(nn.Module):
         self.project = nn.Linear(embed_dim, 1)
 
     def forward(self, image_latent):
-
         temp = torch.max(image_latent, 1)[0]
         logits = self.project(temp)
         return logits.squeeze(1)
@@ -140,14 +139,14 @@ def evaluate(model, loader, args, epoch, city_size):
 
     return calc("Eval", epoch, all_predicts, all_y, all_city, None, city_size, args.target)
 
-
+city_names = ["New York City", "San Francisco", "Washington", "Chicago"]
 def main(args):
     # pip install timm==0.3.2
     # todo: change timm to 1.0.7
 
     init_seed(args.seed)
 
-    init_logging(args)
+    init_logging(args, "sv")
 
     checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
     os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
@@ -164,6 +163,9 @@ def main(args):
     model, preprocessor = prepare_model(args)
 
     for index in tqdm(ava_indexs):
+        sucess_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/success"
+        if not os.path.exists(sucess_path):
+            continue
         _, images = get_images(index, city, args.model, model, preprocessor)
         image_dataset.append([images, task_data[int(index)][-1], city])
 
@@ -175,10 +177,12 @@ def main(args):
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
 
-    train_dataset = DownStreamDataset(train_dataset, model, model_name=args.model, preprocessor=preprocessor)
-    val_dataset = DownStreamDataset(val_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
+    train_dataset = DownStreamDataset(train_dataset, args.target, model_name=args.model, preprocessor=preprocessor)
+    val_dataset = DownStreamDataset(val_dataset, args.target, train_dataset.mean, train_dataset.std,
+                                    model_name=args.model,
                                     preprocessor=preprocessor)
-    test_dataset = DownStreamDataset(test_dataset, model, train_dataset.mean, train_dataset.std, model_name=args.model,
+    test_dataset = DownStreamDataset(test_dataset, args.target, train_dataset.mean, train_dataset.std,
+                                     model_name=args.model,
                                      preprocessor=preprocessor)
 
     # data loader

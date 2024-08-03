@@ -298,7 +298,14 @@ def get_images(index, city, model_name, model, preprocessor):
         else:
             embedding = np.load(embed_path)
         images.append(embedding)
-
+    '''
+    if len(images) >= 10:
+        success_patch = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/success"
+        try:
+            os.makedirs(success_patch, exist_ok=True)
+        except Exception as e:
+            pass
+    '''
     return None, images
 
 
@@ -339,10 +346,10 @@ def load_task_data(city, target):
 from loguru import logger
 
 
-def init_logging(args):
+def init_logging(args, prefix):
     os.makedirs(f"./logs/{args.model}", exist_ok=True)
     logger.remove(handler_id=None)  # remove default logger
-    file_name = f"{args.model}-{args.city_size}-{args.target}-{args.seed}-{args.lr}.log"
+    file_name = f"{prefix}-{args.model}-{args.city_size}-{args.target}-{args.seed}-{args.lr}.log"
     logger.add(os.path.join("./logs", file_name), level="INFO")
     logger.info(args)
 

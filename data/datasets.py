@@ -66,14 +66,19 @@ def transfer_image(model, model_name, image, preprocessor):
 
 
 class DownStreamDataset(Dataset):
-    def __init__(self, dataset, model, mean=None, std=None, model_name="MAE", preprocessor=None):
+    def __init__(self, dataset, type, mean=None, std=None, model_name="MAE", preprocessor=None):
         super().__init__()
         self.imgs = []
         self.labels = []
         self.citys = []
         for images, y, c in tqdm(dataset):
-            if y < 0 or y > 10000:
-                continue
+
+            if type == 0:
+                if y < 0 or y > 500:
+                    continue
+            if type == 1:
+                if y < 0 or y > 10000:
+                    continue
 
             if len(images) < 10:
                 continue
@@ -107,14 +112,18 @@ class DownStreamDataset(Dataset):
 
 
 class ImageryDataset(Dataset):
-    def __init__(self, dataset, model, mean=None, std=None, model_name="MAE", preprocessor=None):
+    def __init__(self, dataset, type, mean=None, std=None, model_name="MAE", preprocessor=None):
         super().__init__()
         self.imgs = []
         self.labels = []
         self.citys = []
         for image, y, c in tqdm(dataset):
-            if y < 0 or y > 10000:
-                continue
+            if type == 0:
+                if y < 0 or y > 500:
+                    continue
+            if type == 1:
+                if y < 0 or y > 10000:
+                    continue
 
             image = torch.tensor(image)
 

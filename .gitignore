@@ -4,3 +4,5 @@ test_llm
 environments
 .idea
 log_buaa.py
+*.csv
+.idea
