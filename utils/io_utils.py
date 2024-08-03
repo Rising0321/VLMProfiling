@@ -28,6 +28,7 @@ from geopy.distance import geodesic, distance
 from great_circle_calculator.great_circle_calculator import intermediate_point
 
 city_names = ["New York City", "San Francisco", "Washington", "Chicago"]
+value_paths = ['Carbon', 'Population', 'NightLight']
 
 
 def get_tile(lon, lat, crs):
@@ -337,10 +338,7 @@ def get_imagery(index, city, model_name, model, preprocessor):
 
 
 def load_task_data(city, target):
-    if target == 0:
-        return np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Carbon.npy")
-    else:
-        return np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/Population.npy")
+    return np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/{value_paths[target]}.npy")
 
 
 from loguru import logger
@@ -390,7 +388,7 @@ def calc(phase, epoch, all_predicts, all_y, all_city, loss, city_size, target):
         if all_city[j] == i:
             new_predicts.append(all_predicts[j])
             new_y.append(all_y[j])
-    target_name = "Carbon" if target == 0 else "Population"
+    target_name = value_paths[target]
     calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: {target_name}')
 
     return calc_one(phase, epoch, all_predicts, all_y, loss, 'Total')

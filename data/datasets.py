@@ -79,7 +79,9 @@ class DownStreamDataset(Dataset):
             if type == 1:
                 if y < 0 or y > 10000:
                     continue
-
+            if type == 2:
+                if y < 0 or y > 500:
+                    continue
             if len(images) < 10:
                 continue
 
@@ -124,7 +126,9 @@ class ImageryDataset(Dataset):
             if type == 1:
                 if y < 0 or y > 10000:
                     continue
-
+            if type == 2:
+                if y < 0 or y > 500:
+                    continue
             image = torch.tensor(image)
 
             self.imgs.append(image)

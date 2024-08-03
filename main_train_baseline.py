@@ -285,15 +285,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--city_size",
         type=int,
-        default=3,
+        default=2,
         help="number of cities",
     )
 
     parser.add_argument(
         "--target",
         type=int,
-        default=1,
-        help="Carbon or Population",
+        default=2,
+        help="Carbon or Population or NightLight",
     )
 
     parser.add_argument(

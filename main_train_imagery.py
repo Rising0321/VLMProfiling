@@ -243,7 +243,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="ViT",  # or ResNet
+        default="MAE",  # or ResNet
         choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
@@ -294,8 +294,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target",
         type=int,
-        default=0,
-        help="Carbon or Population",
+        default=2,
+        help="Carbon or Population or NightLight",
     )
 
     parser.add_argument(
