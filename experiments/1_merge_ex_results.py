@@ -1,9 +1,12 @@
 import os
 import re
+import csv
 
-models = ["CLIP", "ViT", "ResNet", "SimCLR", "MAE"]
+results_path = "wb-im-results.csv"
+prefix = 'im'
+models = ["ViT", "ResNet", "SimCLR", "MAE"]
 cities = [0, 1, 2, 3]
-targets = [0, 1]
+targets = [0, 1, 2]
 seed = 42
 results = []
 
@@ -24,7 +27,7 @@ for city in cities:
             best_lr = None
 
             for lr in lrs:
-                result_path = f"../logs/sv-{model}-{city}-{target}-{seed}-{lr}.log"
+                result_path = f"../logs/{prefix}-{model}-{city}-{target}-{seed}-{lr}.log"
 
                 # open the file and read the last line
                 with open(result_path, 'r') as file:
@@ -49,9 +52,7 @@ for city in cities:
                         best_pcc = pcc
                         best_lr = lr
             results.append([model, city, target, best_mse, best_r2, best_rmse, best_mae, best_mape, best_pcc, best_lr])
-import csv
 
-results_path = "sv-results.csv"
 with open(results_path, 'w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(["model", "city", "target", "mse", "r2", "rmse", "mae", "mape", "pcc"])

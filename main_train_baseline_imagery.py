@@ -9,7 +9,7 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from baselines.MAE import models_vit
-from data.datasets import DownStreamDataset
+from data.datasets import DownStream2Dataset
 from transformers import AutoImageProcessor, ResNetForImageClassification
 from transformers import ViTImageProcessor, ViTModel
 
@@ -149,7 +149,7 @@ def main(args):
 
     init_seed(args.seed)
 
-    init_logging(args, "sv")
+    init_logging(args, "sv+im")
 
     checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
     os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
@@ -170,7 +170,9 @@ def main(args):
         if not os.path.exists(sucess_path):
             continue
         _, images = get_images(index, city, args.model, model, preprocessor)
-        image_dataset.append([images, task_data[int(index)][-1], city])
+        satellite = np.load(
+            f'/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite_embedding_{args.model}.npy')
+        image_dataset.append([images, task_data[int(index)][-1], city, satellite])
 
     # split the dataset into train and test
     train_size = int(0.7 * len(image_dataset))
@@ -180,9 +182,9 @@ def main(args):
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
 
-    train_dataset = DownStreamDataset(train_dataset, args.target)
-    val_dataset = DownStreamDataset(val_dataset, args.target, train_dataset.mean, train_dataset.std)
-    test_dataset = DownStreamDataset(test_dataset, args.target, train_dataset.mean, train_dataset.std)
+    train_dataset = DownStream2Dataset(train_dataset, args.target)
+    val_dataset = DownStream2Dataset(val_dataset, args.target, train_dataset.mean, train_dataset.std)
+    test_dataset = DownStream2Dataset(test_dataset, args.target, train_dataset.mean, train_dataset.std)
 
     # data loader
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)

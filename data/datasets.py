@@ -66,7 +66,7 @@ def transfer_image(model, model_name, image, preprocessor):
 
 
 class DownStreamDataset(Dataset):
-    def __init__(self, dataset, type, mean=None, std=None, model_name="MAE", preprocessor=None):
+    def __init__(self, dataset, type, mean=None, std=None):
         super().__init__()
         self.imgs = []
         self.labels = []
@@ -109,7 +109,58 @@ class DownStreamDataset(Dataset):
         imgs = self.imgs[index]
         indexs = random.sample(range(len(imgs)), 10)
         imgs = imgs[indexs]
+        return imgs, self.labels[index], self.citys[index]
 
+
+class DownStream2Dataset(Dataset):
+    def __init__(self, dataset, type, mean=None, std=None):
+        super().__init__()
+        self.imgs = []
+        self.labels = []
+        self.citys = []
+        self.satellites = []
+        for images, y, c, s in tqdm(dataset):
+
+            if type == 0:
+                if y < 0 or y > 500:
+                    continue
+            if type == 1:
+                if y < 0 or y > 10000:
+                    continue
+            if type == 2:
+                if y < 0 or y > 500:
+                    continue
+            if len(images) < 10:
+                continue
+
+            new_list = torch.tensor(np.stack(images))
+
+            self.imgs.append(new_list)
+            self.labels.append(y)
+            # print(y)
+            self.citys.append(c)
+            self.satellites.append(s)
+
+        if mean is None:
+            self.mean = mean = np.mean(self.labels, axis=0)
+            self.std = std = np.std(self.labels, axis=0)
+            # print(mean, std)
+
+        self.labels = (self.labels - mean) / std
+        self.labels = torch.tensor(self.labels, dtype=torch.float32)
+        self.citys = torch.tensor(self.citys, dtype=torch.long)
+        self.satellites = torch.tensor(np.array(self.satellites), dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.imgs)
+
+    def __getitem__(self, index):
+        # random select 10 images from self.img[index]
+        imgs = self.imgs[index]
+        indexs = random.sample(range(len(imgs)), 10)
+        imgs = imgs[indexs]
+        imgs = torch.cat((imgs, self.satellites[index].unsqueeze(0)), dim=0)
+        # imgs.extend(self.satellites[index])
         return imgs, self.labels[index], self.citys[index]
 
 
