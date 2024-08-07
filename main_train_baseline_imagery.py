@@ -32,7 +32,15 @@ class Linear(nn.Module):
         self.project = nn.Linear(embed_dim, 1)
 
     def forward(self, image_latent):
-        temp = torch.max(image_latent, 1)[0]
+        # temp = torch.max(image_latent, 1)[0]
+        # temp = torch.sum(image_latent, dim=1)
+        # temp = torch.mean(image_latent, dim=1)
+        # temp = image_latent.view(image_latent.size(0), -1)
+        batch = image_latent.shape[0]
+        weights_10 = torch.full((batch, 10), 1 / 20)
+        weights_1 = torch.full((batch, 1), 1 / 2)
+        weights = torch.cat((weights_10, weights_1), dim=1).unsqueeze(-1).cuda()
+        temp = torch.sum(weights * image_latent, dim=1)
         logits = self.project(temp)
         return logits.squeeze(1)
 
@@ -242,7 +250,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="ResNet",
+        default="SimCLR",
         choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
@@ -286,14 +294,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--city_size",
         type=int,
-        default=2,
+        default=0,
         help="number of cities",
     )
 
     parser.add_argument(
         "--target",
         type=int,
-        default=2,
+        default=0,
         help="Carbon or Population or NightLight",
     )
 

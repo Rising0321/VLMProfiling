@@ -32,7 +32,11 @@ class Linear(nn.Module):
         self.project = nn.Linear(embed_dim, 1)
 
     def forward(self, image_latent):
-        temp = torch.max(image_latent, 1)[0]
+        # temp = torch.max(image_latent, 1)[0]
+        # temp = image_latent.view(image_latent.size(0), -1)
+        batch = image_latent.shape[0]
+        weights = torch.full((batch, 10), 1 / 10).unsqueeze(-1).cuda()
+        temp = torch.sum(weights * image_latent, dim=1)
         logits = self.project(temp)
         return logits.squeeze(1)
 
