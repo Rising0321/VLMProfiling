@@ -246,7 +246,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="MAE",  # or ResNet
+        default="CLIP",  # or ResNet
         choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
