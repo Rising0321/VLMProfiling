@@ -9,6 +9,8 @@ results = []
 
 lrs = [1e-3]
 
+name = "im"
+
 pattern = r"mse: (-?[\d\.]+)\s+r2: (-?[\d\.]+)\s+rmse: (-?[\d\.]+)\s+mae: (-?[\d\.]+)\s+mape: (-?[\d\.]+)\s+pcc: (-?[\d\.]+)"
 
 for city in cities:
@@ -24,7 +26,7 @@ for city in cities:
             best_lr = None
 
             for lr in lrs:
-                result_path = f"../logs/sv-{model}-{city}-{target}-{seed}-{lr}.log"
+                result_path = f"../logs/{name}-{model}-{city}-{target}-{seed}-{lr}.log"
 
                 # open the file and read the last line
                 with open(result_path, 'r') as file:
@@ -51,7 +53,7 @@ for city in cities:
             results.append([model, city, target, best_mse, best_r2, best_rmse, best_mae, best_mape, best_pcc, best_lr])
 import csv
 
-results_path = "sv-results.csv"
+results_path = f"{name}-results.csv"
 with open(results_path, 'w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(["model", "city", "target", "mse", "r2", "rmse", "mae", "mape", "pcc"])

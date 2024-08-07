@@ -139,17 +139,23 @@ def evaluate(model, loader, args, epoch, city_size):
 
     return calc("Eval", epoch, all_predicts, all_y, all_city, None, city_size, args.target)
 
+
 city_names = ["New York City", "San Francisco", "Washington", "Chicago"]
+
+
 def main(args):
     # pip install timm==0.3.2
     # todo: change timm to 1.0.7
 
     init_seed(args.seed)
 
-    init_logging(args, "sv")
+    type = "sv"
 
-    checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
-    os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
+    init_logging(args, type)
+
+    checkpoints_dir = f"./baselines/{args.model}/{type}/checkpoints/{args.save_name}.pt"
+
+    os.makedirs(checkpoints_dir.replace(f"{args.save_name}.pt", ""), exist_ok=True)
 
     image_dataset = []
 
@@ -285,14 +291,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--city_size",
         type=int,
-        default=2,
+        default=0,
         help="number of cities",
     )
 
     parser.add_argument(
         "--target",
         type=int,
-        default=2,
+        default=1,
         help="Carbon or Population or NightLight",
     )
 

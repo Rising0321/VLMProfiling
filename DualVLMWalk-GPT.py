@@ -18,7 +18,7 @@ from transformers import AutoModel, AutoTokenizer
 
 import torch
 
-from utils.io_utils import load_access_street_view, get_graph_and_images, get_graph_and_images_dual
+from utils.io_utils import load_access_street_view, get_graph_and_images, get_graph_and_images_dual, output_words
 from utils.math_utils import pnt2line, get_dis
 
 import networkx as nx
@@ -33,45 +33,10 @@ from io import BytesIO
 city_names = ["New York City", "San Francisco", "Washington", "Chicago"]
 
 
-def shrink_graph(g):
-    new_g = nx.Graph()
-    for edge in g.edges(data=True):
-        node1, node2, _ = edge
-        for node in [node1, node2]:
-            color_now = g.edges[edge[0], edge[1]]["image"]
-            coord_now = g.edges[edge[0], edge[1]]["coord"]
-            for neighbor in g.neighbors(node):
-                neigh_color = g.edges[(node, neighbor)]["image"]
-                neigh_coord = g.edges[(node, neighbor)]["coord"]
-                if neigh_color != color_now:
-                    coord_now = tuple(coord_now)
-                    neigh_coord = tuple(neigh_coord)
-                    new_g.add_edge(coord_now, neigh_coord)
-                    # print(coord_now, neigh_coord)
-                    new_g.nodes[coord_now]["image"] = color_now
-                    new_g.nodes[neigh_coord]["image"] = neigh_color
-    print(len(new_g.edges))
-    return new_g, get_start_point(new_g)
 
-def get_start_point(g):
-    ans = -1
-    diversity_max = 0
-    for node in g.nodes:
-        # diversity = get_streetView_diversity_crossingBase(sub_g, node)
-        diversity = get_streetView_diversity_distanceBase(g, node)
-        if diversity > diversity_max:
-            diversity_max = diversity
-            ans = node
-    output_words(args, "### Start_point's diversity is " + str(diversity_max))
-    return ans
 
-def get_streetView_diversity_distanceBase(sub_g, node):
-    R = 0.003 # 距离的半径
-    diversity = 0
-    for now_node in sub_g.nodes:
-        if (node[0] - now_node[0])**2 + (node[1] - now_node[1])**2 <= R**2:
-            diversity += (R**2 - ((node[0] - now_node[0])**2 + (node[1] - now_node[1])**2)) * 1000000 # 比例可调整
-    return diversity
+
+
 
 def get_model(args):
     # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -217,13 +182,6 @@ def ask_middle_image(model, tokenizer, image, previous_summary):
             continue
 
 
-def output_words(args, text):
-    filename = f"./log/{args.model}/{args.save_name}.md"
-    # 打开文件，追加内容，然后关闭文件
-    with open(filename, 'a') as file:
-        file.write("\n")
-        file.write(text)
-        file.write("\n")
 
 
 def llm_walk(sub_g, start_point, model, tokenizer, images, args):

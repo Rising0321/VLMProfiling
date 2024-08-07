@@ -62,8 +62,13 @@ def read_images(street_views, city, index):
     images = {}
     for idx, item in street_views.iterrows():
         path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/{item['id_0']}.jpg"
-        image = Image.open(path).convert('RGB')
-        images[int(item['id_0'])] = image  # TODO=
+        try:
+            image = Image.open(path).convert('RGB')
+            images[int(item['id_0'])] = image  # TODO=
+        except Exception as e:
+            print(e)
+            print(path)
+            continue
     return images
 
 
@@ -124,6 +129,7 @@ def assign_edge_color(sub_g, street_views, color_node):
             dist = geodesic(parse_coord(item['target']), edge[2]['target']).m
             if dist < 1e-3:
                 sub_g.edges[edge[0], edge[1]]["image"] = item['id_0']  # but this maybe not exists
+                # print(sub_g.edges[edge[0], edge[1]]["image"])
                 # TODO
                 lon, lat = parse_coord(item['target'])
                 sub_g.edges[edge[0], edge[1]]["coord"] = [lon, lat]
@@ -166,8 +172,8 @@ def my_read_edge_list(file_path):
             midpoint = intermediate_point(point1, point2, 0.5)
         sub_g.add_edge(point1, point2, target=midpoint)
     sub_g.graph['crs'] = crs
-    print('G edges:', len(G.edges))
-    print('sub_g edges: ', len(sub_g.edges))
+    # print('G edges:', len(G.edges))
+    # print('sub_g edges: ', len(sub_g.edges))
     # with open(file_path, 'r') as file:
     #     for line in file:
     #         node1, node2, attr = parse_edgelist_line(line)
@@ -201,6 +207,58 @@ def get_graph_and_images_dual(index, city, value_path):
     start_point = get_strat_point(sub_g)
     print_bottom(sub_g, street_views, colors_edge, colors)
     return sub_g, street_views, images
+
+
+def output_words(args, text):
+    filename = f"./log/{args.model}/{args.save_name}.md"
+    # 打开文件，追加内容，然后关闭文件
+    with open(filename, 'a') as file:
+        file.write("\n")
+        file.write(text)
+        file.write("\n")
+
+
+def get_streetView_diversity_distanceBase(sub_g, node):
+    R = 0.003  # 距离的半径
+    diversity = 0
+    for now_node in sub_g.nodes:
+        if (node[0] - now_node[0]) ** 2 + (node[1] - now_node[1]) ** 2 <= R ** 2:
+            diversity += (R ** 2 - ((node[0] - now_node[0]) ** 2 + (node[1] - now_node[1]) ** 2)) * 1000000  # 比例可调整
+    return diversity
+
+
+def get_start_point(g):
+    ans = -1
+    diversity_max = 0
+    for node in g.nodes:
+        # diversity = get_streetView_diversity_crossingBase(sub_g, node)
+        diversity = get_streetView_diversity_distanceBase(g, node)
+        if diversity > diversity_max:
+            diversity_max = diversity
+            ans = node
+    # output_words(args, "### Start_point's diversity is " + str(diversity_max))
+    return ans
+
+
+def shrink_graph(g):
+    new_g = nx.Graph()
+    for edge in g.edges(data=True):
+        node1, node2, _ = edge
+        for node in [node1, node2]:
+            color_now = g.edges[edge[0], edge[1]]["image"]
+            coord_now = g.edges[edge[0], edge[1]]["coord"]
+            for neighbor in g.neighbors(node):
+                neigh_color = g.edges[(node, neighbor)]["image"]
+                neigh_coord = g.edges[(node, neighbor)]["coord"]
+                if neigh_color != color_now:
+                    coord_now = tuple(coord_now)
+                    neigh_coord = tuple(neigh_coord)
+                    new_g.add_edge(coord_now, neigh_coord)
+                    # print(coord_now, neigh_coord)
+                    new_g.nodes[coord_now]["image"] = color_now
+                    new_g.nodes[neigh_coord]["image"] = neigh_color
+    # print(len(new_g.edges))
+    return new_g, get_start_point(new_g)
 
 
 imagenet_mean = np.array([0.485, 0.456, 0.406])

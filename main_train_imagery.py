@@ -148,10 +148,13 @@ def main(args):
 
     init_seed(args.seed)
 
-    init_logging(args,"im")
+    type = "im"
 
-    checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
-    os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
+    init_logging(args, type)
+
+    checkpoints_dir = f"./baselines/{args.model}/{type}/checkpoints/{args.save_name}.pt"
+
+    os.makedirs(checkpoints_dir.replace(f"{args.save_name}.pt", ""), exist_ok=True)
 
     image_dataset = []
 

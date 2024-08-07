@@ -109,7 +109,6 @@ class DownStreamDataset(Dataset):
         imgs = self.imgs[index]
         indexs = random.sample(range(len(imgs)), 10)
         imgs = imgs[indexs]
-
         return imgs, self.labels[index], self.citys[index]
 
 
@@ -151,3 +150,39 @@ class ImageryDataset(Dataset):
 
     def __getitem__(self, index):
         return self.imgs[index], self.labels[index], self.citys[index]
+
+class WalkDataset(Dataset):
+    def __init__(self, dataset, type, mean=None, std=None):
+        super().__init__()
+
+        self.indexs = []
+        self.labels = []
+
+        for index, y in tqdm(dataset):
+
+            if type == 0:
+                if y < 0 or y > 500:
+                    continue
+            if type == 1:
+                if y < 0 or y > 10000:
+                    continue
+            if type == 2:
+                if y < 0 or y > 500:
+                    continue
+
+            self.indexs.append(index)
+            self.labels.append(y)
+
+        if mean is None:
+            self.mean = mean = np.mean(self.labels, axis=0)
+            self.std = std = np.std(self.labels, axis=0)
+            # print(mean, std)
+
+        self.labels = (self.labels - mean) / std
+
+    def __len__(self):
+        return len(self.indexs)
+
+    def __getitem__(self, index):
+
+        return self.indexs[index], self.labels[index]
