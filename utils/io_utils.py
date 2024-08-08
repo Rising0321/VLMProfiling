@@ -62,13 +62,21 @@ def read_images(street_views, city, index):
     images = {}
     for idx, item in street_views.iterrows():
         path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/{item['id_0']}.jpg"
-        try:
-            image = Image.open(path).convert('RGB')
-            images[int(item['id_0'])] = image  # TODO=
-        except Exception as e:
-            print(e)
-            print(path)
-            continue
+        if not os.path.exists(path):
+            real_path = path.replace('squeeze_images', 'images')
+            image = Image.open(real_path).convert('RGB')
+            image = image.resize((224, 224))
+            # save image to real_root_path
+            image.save(path)
+            images[int(item['id_0'])] = image
+        else:
+            try:
+                image = Image.open(path).convert('RGB')
+                images[int(item['id_0'])] = image  # TODO=
+            except Exception as e:
+                print(e)
+                print(path)
+                continue
     return images
 
 
@@ -126,7 +134,9 @@ def assign_edge_color(sub_g, street_views, color_node):
     for idx1, edge in enumerate(sub_g.edges(data=True)):
         pos = 0
         for idx2, item in street_views.iterrows():
-            dist = geodesic(parse_coord(item['target']), edge[2]['target']).m
+            lon, lat = parse_coord(item['target'])
+            t_lon, t_lat = edge[2]['target']
+            dist = geodesic((lat, lon), (t_lat, t_lon)).m
             if dist < 1e-3:
                 sub_g.edges[edge[0], edge[1]]["image"] = item['id_0']  # but this maybe not exists
                 # print(sub_g.edges[edge[0], edge[1]]["image"])
@@ -191,7 +201,7 @@ def get_graph_and_images(index, city, value_path):
     colors_edge = assign_edge_color(sub_g, street_views, colors)
     images = read_images(street_views, city)
     start_point = get_strat_point(sub_g)
-    print_bottom(sub_g, street_views, colors_edge, colors)
+    # print_bottom(sub_g, street_views, colors_edge, colors)
     return sub_g, street_views, images, start_point
 
 
@@ -205,7 +215,7 @@ def get_graph_and_images_dual(index, city, value_path):
     colors_edge = assign_edge_color(sub_g, street_views, colors)
     images = read_images(street_views, city, index)
     start_point = get_strat_point(sub_g)
-    print_bottom(sub_g, street_views, colors_edge, colors)
+    # print_bottom(sub_g, street_views, colors_edge, colors)
     return sub_g, street_views, images
 
 

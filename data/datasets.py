@@ -203,14 +203,15 @@ class ImageryDataset(Dataset):
     def __getitem__(self, index):
         return self.imgs[index], self.labels[index], self.citys[index]
 
+
 class WalkDataset(Dataset):
     def __init__(self, dataset, type, mean=None, std=None):
         super().__init__()
 
         self.indexs = []
         self.labels = []
-
-        for index, y in tqdm(dataset):
+        self.satellites = []
+        for index, y, s in tqdm(dataset):
 
             if type == 0:
                 if y < 0 or y > 500:
@@ -224,6 +225,7 @@ class WalkDataset(Dataset):
 
             self.indexs.append(index)
             self.labels.append(y)
+            self.satellites.append(s)
 
         if mean is None:
             self.mean = mean = np.mean(self.labels, axis=0)
@@ -231,10 +233,11 @@ class WalkDataset(Dataset):
             # print(mean, std)
 
         self.labels = (self.labels - mean) / std
+        self.satellites = torch.tensor(np.array(self.satellites), dtype=torch.float32)
 
     def __len__(self):
         return len(self.indexs)
 
     def __getitem__(self, index):
 
-        return self.indexs[index], self.labels[index]
+        return self.indexs[index], self.labels[index], self.satellites[index]

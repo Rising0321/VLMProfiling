@@ -29,18 +29,18 @@ embed_dims = {
 class Linear(nn.Module):
     def __init__(self, embed_dim):
         super().__init__()
-        self.project = nn.Linear(embed_dim, 1)
+        self.project = nn.Linear(embed_dim * 11, 1)
 
     def forward(self, image_latent):
         # temp = torch.max(image_latent, 1)[0]
         # temp = torch.sum(image_latent, dim=1)
         # temp = torch.mean(image_latent, dim=1)
-        # temp = image_latent.view(image_latent.size(0), -1)
-        batch = image_latent.shape[0]
-        weights_10 = torch.full((batch, 10), 1 / 20)
-        weights_1 = torch.full((batch, 1), 1 / 2)
-        weights = torch.cat((weights_10, weights_1), dim=1).unsqueeze(-1).cuda()
-        temp = torch.sum(weights * image_latent, dim=1)
+        temp = image_latent.view(image_latent.size(0), -1)
+        # batch = image_latent.shape[0]
+        # weights_10 = torch.full((batch, 10), 1 / 20)
+        # weights_1 = torch.full((batch, 1), 1 / 2)
+        # weights = torch.cat((weights_10, weights_1), dim=1).unsqueeze(-1).cuda()
+        # temp = torch.sum(weights * image_latent, dim=1)
         logits = self.project(temp)
         return logits.squeeze(1)
 
@@ -157,9 +157,11 @@ def main(args):
 
     init_seed(args.seed)
 
-    init_logging(args, "sv+im")
+    type = "sv+im"
 
-    checkpoints_dir = f"./baselines/{args.model}/checkpoints/{args.save_name}.pt"
+    init_logging(args, type)
+
+    checkpoints_dir = f"./baselines/{args.model}/checkpoints/cat-{type}-{args.city_size}-{args.target}.pt"
     os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
 
     image_dataset = []
@@ -250,7 +252,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="SimCLR",
+        default="ResNet",
         choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
@@ -301,7 +303,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target",
         type=int,
-        default=0,
+        default=1,
         help="Carbon or Population or NightLight",
     )
 

@@ -29,14 +29,14 @@ embed_dims = {
 class Linear(nn.Module):
     def __init__(self, embed_dim):
         super().__init__()
-        self.project = nn.Linear(embed_dim, 1)
+        self.project = nn.Linear(embed_dim * 10, 1)
 
     def forward(self, image_latent):
         # temp = torch.max(image_latent, 1)[0]
-        # temp = image_latent.view(image_latent.size(0), -1)
-        batch = image_latent.shape[0]
-        weights = torch.full((batch, 10), 1 / 10).unsqueeze(-1).cuda()
-        temp = torch.sum(weights * image_latent, dim=1)
+        temp = image_latent.view(image_latent.size(0), -1)
+        # batch = image_latent.shape[0]
+        # weights = torch.full((batch, 10), 1 / 10).unsqueeze(-1).cuda()
+        # temp = torch.sum(weights * image_latent, dim=1)
         logits = self.project(temp)
         return logits.squeeze(1)
 
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="ResNet",
+        default="CLIP",
         choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--city_size",
         type=int,
-        default=0,
+        default=3,
         help="number of cities",
     )
 

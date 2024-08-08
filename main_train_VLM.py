@@ -21,12 +21,19 @@ embed_dims = {
 
 
 class Linear(nn.Module):
-    def __init__(self, embed_dim):
+    def __init__(self, embed_dim, type):
         super().__init__()
-        self.project = nn.Linear(embed_dim, 1)
+        if type == 'sv+im':
+            self.project = nn.Linear(embed_dim * 11, 1)
+        elif type == 'sv':
+            self.project = nn.Linear(embed_dim * 10, 1)
 
     def forward(self, image_latent):
-        temp = torch.max(image_latent, 0)[0]
+        # temp = torch.max(image_latent, 0)[0]
+        temp = image_latent.view(-1)
+        # weight = 1 / 10
+        # image_latent = image_latent * weight
+        # temp = torch.sum(image_latent, dim=0)
         logits = self.project(temp)
         return logits
 
@@ -53,26 +60,23 @@ def evaluate(model, loader, args):
     all_predicts = []
     all_city = []
 
-    for index, y in tqdm(loader):
-
+    for index, y, s in tqdm(loader):
         index = int(index[0])
 
-        if index == 983 or index == 979:
-            continue
-
+        # if index == 983 or index == 979:
+        #     continue
         sub_g, street_views, images = get_graph_and_images_dual(index, args.city_size, args.target)
 
         new_g, start_point = shrink_graph(sub_g)
 
         images = random_walk(new_g, start_point, args, index)
-
-        image = images.to(device)
-        image_latent = model(image)
+        images = torch.cat((images, s), dim=0)
+        images = images.to(device)
+        image_latent = model(images)
 
         all_predicts.append(float(image_latent.cpu().detach()))
         all_y.append(float(y.cpu().detach()))
         all_city.append(args.city_size)
-
 
     return calc("Eval", 233, all_predicts, all_y, all_city, None, args.city_size, args.target)
 
@@ -86,12 +90,12 @@ def main(args):
 
     init_seed(args.seed)
 
-    type = "sv"
+    type = "sv+im"
 
-    init_logging(args, type)
+    init_logging(args, "random")
 
-    checkpoints_dir = f"./baselines/{args.model}/{type}/checkpoints/{args.save_name}.pt"
-    os.makedirs(checkpoints_dir.replace(f"{args.save_name}.pt", ""), exist_ok=True)
+    checkpoints_dir = f"./baselines/{args.model}/checkpoints/cat-{type}-{args.city_size}-{args.target}.pt"
+    # os.makedirs(checkpoints_dir.replace(f"{args.save_name}.pt", ""), exist_ok=True)
 
     idx_dataset = []
 
@@ -106,7 +110,9 @@ def main(args):
         sucess_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/success"
         if not os.path.exists(sucess_path):
             continue
-        idx_dataset.append([index, task_data[int(index)][-1]])
+        satellite = np.load(
+            f'/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite_embedding_{args.model}.npy')
+        idx_dataset.append([index, task_data[int(index)][-1], satellite])
 
     # split the dataset into train and test
     train_size = int(0.7 * len(idx_dataset))
@@ -123,7 +129,7 @@ def main(args):
     # data loader
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-    model = Linear(embed_dims[args.model]).to(args.gpu)
+    model = Linear(embed_dims[args.model], type).to(args.gpu)
     checkpoint = torch.load(checkpoints_dir)
     model.load_state_dict(checkpoint['state_dict'])
 
@@ -144,7 +150,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="ResNet",
+        default="ViT",
         choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
@@ -188,7 +194,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--city_size",
         type=int,
-        default=0,
+        default=3,
         help="number of cities",
     )
 

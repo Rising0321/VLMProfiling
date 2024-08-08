@@ -2,8 +2,7 @@ import os
 import re
 import csv
 
-results_path = "wb-im-results.csv"
-prefix = 'im'
+results_path = "random-sv+im-results.csv"
 models = ["ViT", "ResNet", "SimCLR", "MAE"]
 cities = [0, 1, 2, 3]
 targets = [0, 1, 2]
@@ -12,7 +11,7 @@ results = []
 
 lrs = [1e-3]
 
-name = "im"
+name = "random"
 
 pattern = r"mse: (-?[\d\.]+)\s+r2: (-?[\d\.]+)\s+rmse: (-?[\d\.]+)\s+mae: (-?[\d\.]+)\s+mape: (-?[\d\.]+)\s+pcc: (-?[\d\.]+)"
 
@@ -37,7 +36,7 @@ for city in cities:
                     last_line = lines[-1]
                     # 2024-07-31 23:50:38.268 | INFO     | utils.io_utils:log_result:275 - Washington: Carbon: Eval Epoch: test mse: 0.4704	r2: 0.5637	rmse: 0.6858	mae: 0.4912	mape: 2.4505	pcc: 0.7709
                     # use the last line to get the results
-                    print(last_line)
+                    print(result_path, last_line)
                     matches = re.search(pattern, last_line)
                     mse = matches.group(1)
                     r2 = matches.group(2)
