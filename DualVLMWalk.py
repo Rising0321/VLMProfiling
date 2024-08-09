@@ -77,7 +77,7 @@ def ask_start_image(model, tokenizer, image, previous_summary):
     for new_text in res:
         generated_text += new_text
 
-    print(generated_text)
+    # print(generated_text)
     return generated_text
 
 
@@ -86,7 +86,7 @@ def get_score(generated_text):
 
     if match:
         score = match.groups()[0]
-        print(score)
+        # print(score)
         return int(score)
     else:
         raise ValueError("Line format is incorrect")
@@ -115,7 +115,7 @@ def ask_summary_image(model, tokenizer, image, previous_summary):
     for new_text in res:
         generated_text += new_text
 
-    print(generated_text)
+    # print(generated_text)
     return generated_text
 
 
@@ -144,7 +144,7 @@ def ask_middle_image(model, tokenizer, image, previous_summary):
             for new_text in res:
                 generated_text += new_text
 
-            print(generated_text)
+            # print(generated_text)
             score = get_score(generated_text)
             return score, generated_text
 

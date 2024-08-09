@@ -5,11 +5,13 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 from data.datasets import DownStreamDataset, WalkDataset
 from utils.io_utils import load_access_street_view, load_task_data, calc, init_seed, init_logging, \
     get_graph_and_images_dual, shrink_graph
+from DualVLMWalk import ask_start_image, ask_middle_image, get_model
+import concurrent.futures
 
 embed_dims = {
     'MAE': 1024,
@@ -37,22 +39,34 @@ class Linear(nn.Module):
         logits = self.project(temp)
         return logits
 
-
-def random_walk(g, start_point, args, index):
-    images = []
-    for i in range(10):
+def random_walk(g, start_point, args, index, llm, tokenizer, images):
+    id = int(g.nodes[start_point]["image"])
+    image = images[id]
+    images_emb = []
+    summary = ask_start_image(llm, tokenizer, image, "")
+    for i in trange(10):
         try:
             embedding_path = f"/home/wangb/OpenVIRL/data/{city_names[args.city_size]}/{index}/image_embeddings/{g.nodes[start_point]['image']}-{args.model}.npy"
-            images.append(np.load(embedding_path))
+            images_emb.append(np.load(embedding_path))
             neighbors = list(g.neighbors(start_point))
-            len_nei = len(neighbors)
-            start_point = neighbors[random.randint(0, len_nei - 1)]
+            best_neighbor = -1
+            best_answer = -1
+            best_image = -1
+            for neighbor in neighbors:
+                id = int(g.nodes[neighbor]["image"])
+                now_image = images[id]
+                answer, reason = ask_middle_image(llm, tokenizer, now_image, summary)
+                if answer > best_answer:
+                    best_answer = answer
+                    best_neighbor = neighbor
+            start_point = best_neighbor
         except Exception as e:
             print(e)
-    return torch.tensor(images).float()
+    # exit(0)
+    return torch.tensor(images_emb).float()
 
 
-def evaluate(model, loader, args):
+def evaluate(model, loader, args, llm, tokenizer):
     device = torch.device(args.gpu)
     model.eval()
 
@@ -69,10 +83,10 @@ def evaluate(model, loader, args):
 
         new_g, start_point = shrink_graph(sub_g)
 
-        images = random_walk(new_g, start_point, args, index)
-        images = torch.cat((images, s), dim=0)
-        images = images.to(device)
-        image_latent = model(images)
+        image_emb = random_walk(new_g, start_point, args, index, llm, tokenizer, images)
+        image_emb = torch.cat((image_emb, s), dim=0)
+        image_emb = image_emb.to(device)
+        image_latent = model(image_emb)
 
         all_predicts.append(float(image_latent.cpu().detach()))
         all_y.append(float(y.cpu().detach()))
@@ -106,6 +120,8 @@ def main(args):
 
     task_data = load_task_data(city, args.target)
 
+    llm, tokenizer = get_model(args)
+
     for index in tqdm(ava_indexs):
         sucess_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/success"
         if not os.path.exists(sucess_path):
@@ -133,7 +149,7 @@ def main(args):
     checkpoint = torch.load(checkpoints_dir)
     model.load_state_dict(checkpoint['state_dict'])
 
-    evaluate(model, test_loader, args)
+    evaluate(model, test_loader, args, llm, tokenizer)
 
 
 if __name__ == "__main__":
