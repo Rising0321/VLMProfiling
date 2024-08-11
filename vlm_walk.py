@@ -166,21 +166,11 @@ def main(args):
 
 
 '''
-    "image_dir": "/home/wangb/OpenVIRL/data",
-    "task_dir": "/home/wangb/zhangrx/LLMInvestrigator/data/TaskData",
-    "log_dir": "/home/wangb/zhangrx/LLMInvestrigator/logs",
-    "model_dir": "/home/wangb/zhangrx/LLMInvestrigator/words",
-    "save_dir": "/home/wangb/VLMProfiling/baselines"
-    "minicpm": "/home/wangb/zhangrx/models/MiniCPM-Llama3-V-2_5"
-
-    mkdir image_data
-    scp -r wangb@10.254.73.179:/home/wangb/OpenVIRL/data ./image_data
-    mkdir logs
-    scp -r wangb@10.254.73.179:/home/wangb/zhangrx/LLMInvestrigator/logs ./logs
-    mkdir words
-    scp -r wangb@10.254.73.179:/home/wangb/zhangrx/LLMInvestrigator/words ./words
-    mkdir baselines
-    scp -r wangb@10.254.73.179:/home/wangb/VLMProfiling/baselines ./baselines
+    CUDA_VISIBLE_DEVICES=2 python vlm_walk.py --city_size 0  --location zrx
+    CUDA_VISIBLE_DEVICES=3 python vlm_walk.py --city_size 1  --location zrx
+    CUDA_VISIBLE_DEVICES=0 python vlm_walk.py --city_size 2  --location wb
+    CUDA_VISIBLE_DEVICES=1 python vlm_walk.py --city_size 3  --location wb
+    
 '''
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

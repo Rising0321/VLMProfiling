@@ -8,8 +8,11 @@
     "minicpm": "/home/wangb/zhangrx/models/MiniCPM-Llama3-V-2_5"
   },
   "zrx": {
-    "image_dir": "4900",
-    "log_dir": "files/GeoLife/",
-    "check_point_dir": ""
+    "image_dir": "/home/zhangrx/VLMInvest/data",
+    "task_dir": "/home/zhangrx/VLMInvest/data/task",
+    "log_dir": "/home/zhangrx/VLMInvest/logs",
+    "model_dir": "/home/zhangrx/VLMInvest/words",
+    "save_dir": "/home/zhangrx/VLMInvest/baselines",
+    "minicpm": "/home/zhangrx/VLMInvest/llms/MiniCPM-Llama3-V-2_5"
   }
 }

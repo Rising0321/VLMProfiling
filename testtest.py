@@ -25,3 +25,4 @@ for model in models:
 
             os.system(
                 f"CUDA_VISIBLE_DEVICES=1 /home/wangb/.conda/envs/llm/bin/python main_train_baseline_imagery_mean.py --model {model} --city_size {city} --target {target}")
+# /home/zhangrx/.conda/envs/llm/bin/python

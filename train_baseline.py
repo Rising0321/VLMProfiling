@@ -9,14 +9,17 @@ import numpy as np
 import torch.nn as nn
 from tqdm import tqdm
 
+'''
 from baselines.MAE import models_vit
+'''
+
 from data.datasets import DownStreamDataset, ImageryDataset
 from transformers import AutoImageProcessor, ResNetForImageClassification
 from transformers import ViTImageProcessor, ViTModel
 
 from simclr import SimCLR
 from simclr.modules import get_resnet
-import open_clip
+# import open_clip
 
 embed_dims = {
     'MAE': 1024,

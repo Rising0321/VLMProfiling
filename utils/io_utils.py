@@ -472,7 +472,7 @@ def get_model(args):
                                       trust_remote_code=True)
     model = model.to(device=args.gpu)
 
-    tokenizer = AutoTokenizer.from_pretrained('/home/wangb/zhangrx/models/MiniCPM-Llama3-V-2_5',
+    tokenizer = AutoTokenizer.from_pretrained(model_path,
                                               trust_remote_code=True)
     model.eval()
 
