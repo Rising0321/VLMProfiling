@@ -11,7 +11,7 @@ from tqdm import tqdm, trange
 
 from data.datasets import DownStreamDataset, WalkDataset
 from utils.io_utils import load_access_street_view, load_task_data, calc, init_seed, init_logging, \
-    get_graph_and_images_dual, shrink_graph
+    get_graph_and_images_dual, shrink_graph, parse_json
 from DualVLMWalk import ask_start_image, ask_middle_image, get_model, ask_summary_image
 
 embed_dims = {
@@ -41,20 +41,20 @@ class Linear(nn.Module):
         return logits
 
 
-def get_images(index, city):
-    images_path = f'/home/wangb/zhangrx/LLMInvestrigator/log/supervised/{city}/{index}_image.md'
+def get_images(index, city, model_dir, image_dir):
+    images_path = f'{model_dir}/supervised/{city}/{index}_image.md'
     with open(images_path, 'r', encoding='utf-8') as file:
         content = file.read()
 
     images = [i for i in list(content.split('\n')) if i][-10:]
     images_emb = []
     for image in images:
-        embedding_path = f"/home/wangb/OpenVIRL/data/{city}/{index}/image_embeddings/{image}-{args.model}.npy"
+        embedding_path = f"{image_dir}/{city}/{index}/image_embeddings/{image}-{args.model}.npy"
         images_emb.append(np.load(embedding_path))
     return torch.tensor(np.array(images_emb)).float()
 
 
-def evaluate(model, loader, args, llm, tokenizer, city):
+def evaluate(model, loader, args, llm, tokenizer, city, model_dir, image_dir):
     device = torch.device(args.gpu)
     # model.eval()
 
@@ -65,7 +65,7 @@ def evaluate(model, loader, args, llm, tokenizer, city):
     for index, y, s in tqdm(loader):
         index = int(index[0])
 
-        image_emb = get_images(index, city)
+        image_emb = get_images(index, city, model_dir, image_dir)
         image_emb = torch.cat((image_emb, s), dim=0)
         image_emb = image_emb.to(device)
         image_latent = model(image_emb)
@@ -79,12 +79,11 @@ def evaluate(model, loader, args, llm, tokenizer, city):
 city_names = ["New York City", "San Francisco", "Washington", "Chicago"]
 
 
-# run_logs = "./run_logs/city/"
-# zero_logs = "./zero_logs/city/target/"
-
 def main(args):
     # pip install timm==0.3.2
     # todo: change timm to 1.0.7
+
+    image_dir, model_dir, save_dir, log_dir, task_dir = parse_json(args)
 
     init_seed(args.seed)
 
@@ -94,21 +93,21 @@ def main(args):
 
     type = "sv+im"
 
-    checkpoints_dir = f"./baselines/{args.model}/checkpoints/cat-{type}-{args.city_size}-{args.target}.pt"
+    checkpoints_dir = f"{save_dir}/{args.model}/checkpoints/cat-{type}-{args.city_size}-{args.target}.pt"
+    os.makedirs(f"{save_dir}/{args.model}/checkpoints/", exist_ok=True)
 
-    # todo: for test, can repeat the following code with
-    ava_indexs = load_access_street_view(city)
+    ava_indexs = load_access_street_view(image_dir, city)
 
-    task_data = load_task_data(city, args.target)
+    task_data = load_task_data(city, args.target, task_dir)
 
     llm, tokenizer = get_model(args)
 
     for index in tqdm(ava_indexs):
-        sucess_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/success"
+        sucess_path = f"{image_dir}/{city_names[city]}/{index}/success"
         if not os.path.exists(sucess_path):
             continue
         satellite = np.load(
-            f'/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite_embedding_{args.model}.npy')
+            f'{image_dir}/{city_names[city]}/{index}/satellite_embedding_{args.model}.npy')
         idx_dataset.append([index, task_data[int(index)][-1], satellite])
 
     # split the dataset into train and test
@@ -133,11 +132,18 @@ def main(args):
     checkpoint = torch.load(checkpoints_dir, weights_only=True)
     model.load_state_dict(checkpoint['state_dict'])
 
-    evaluate(model, test_loader, args, llm, tokenizer, city_names[city])
+    evaluate(model, test_loader, args, llm, tokenizer, city_names[city], model_dir, image_dir)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--location",
+        type=str,
+        default="wb",
+        help="wb or zrx",
+    )
 
     parser.add_argument(
         "--save_name",

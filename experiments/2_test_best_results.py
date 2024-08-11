@@ -47,20 +47,22 @@ for target in targets:
             mse1, r2_1, rmse1, mae1, mape1, pcc1 = read_res(result_path)
             if best_r2 < r2_1:
                 best_r2 = r2_1
+            ress.append(r2_1)
 
+        cnt = 0
+        for model in models:
             result_path = f"../logs/{name2}-{model}-{city}-{target}-{seed}-{lr}.log"
 
             mse2, r2_2, rmse2, mae2, mape2, pcc2 = read_res(result_path)
-            if best_r2 < r2_2:
-                best_r2 = r2_2
 
-            ress.append(r2_1)
-            ress.append(r2_2)
-        cnt = 0
-        for res in ress:
-            if res == best_r2:
+            flag = 1
+            for res in ress:
+                if res > r2_2:
+                    flag = 0
+                    break
+
+            if flag == 1:
                 best_cnt[cnt] += 1
-                break
             cnt += 1
-    print(best_cnt)
+        print(best_cnt)
 print(best_cnt)

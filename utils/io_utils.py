@@ -4,6 +4,9 @@ import re
 import torch
 
 from ast import literal_eval
+
+from transformers import AutoModel, AutoTokenizer
+
 from utils.math_utils import get_dis
 import os
 import osmnx as ox
@@ -52,16 +55,32 @@ def parse_edgelist_line(line):
         raise ValueError("Line format is incorrect")
 
 
-def load_access_street_view(city):
-    temp = os.listdir(f"/home/wangb/OpenVIRL/data/{city_names[city]}")
+def parse_json(args):
+    # load data/config.json
+    import json
+    with open(f"./data/config.json", 'r') as f:
+        data = json.load(f)
+
+    data = data[args.location]
+    image_dir = data["image_dir"]
+    model_dir = data["model_dir"]
+    save_dir = data["save_dir"]
+    log_dir = data["log_dir"]
+    task_dir = data["task_dir"]
+
+    return image_dir, model_dir, save_dir, log_dir, task_dir
+
+
+def load_access_street_view(image_dir, city):
+    temp = os.listdir(f"{image_dir}/{city_names[city]}")
 
     return temp
 
 
-def read_images(street_views, city, index):
+def read_images(street_views, city, index, image_dir):
     images = {}
     for idx, item in street_views.iterrows():
-        path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images/{item['id_0']}.jpg"
+        path = f"{image_dir}/{city_names[city]}/{index}/squeeze_images/{item['id_0']}.jpg"
         if not os.path.exists(path):
             real_path = path.replace('squeeze_images', 'images')
             image = Image.open(real_path).convert('RGB')
@@ -191,29 +210,15 @@ def my_read_edge_list(file_path):
     return sub_g
 
 
-def get_graph_and_images(index, city, value_path):
-    street_views = index.replace(".graphml", ".csv")
-    sub_g = my_read_edge_list(
-        f"/home/work/wangb/OpenVIRL/data/networks/{city_names[city]}/{value_path}/{index}")
-    street_views = pd.read_csv(
-        f"/home/work/wangb/OpenVIRL/data/streetviews/{city_names[city]}/{value_path}/{street_views}")
-    colors = assign_color(street_views)
-    colors_edge = assign_edge_color(sub_g, street_views, colors)
-    images = read_images(street_views, city)
-    start_point = get_strat_point(sub_g)
-    # print_bottom(sub_g, street_views, colors_edge, colors)
-    return sub_g, street_views, images, start_point
-
-
-def get_graph_and_images_dual(index, city, value_path):
+def get_graph_and_images_dual(index, city, image_dir):
     # street_views = index.replace(".edgelist", ".npy")
     sub_g = my_read_edge_list(
-        f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/roads.graphml")
+        f"{image_dir}/{city_names[city]}/{index}/roads.graphml")
     street_views = pd.read_csv(
-        f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/matches.csv")
+        f"{image_dir}/{city_names[city]}/{index}/matches.csv")
     colors = assign_color(street_views)
     colors_edge = assign_edge_color(sub_g, street_views, colors)
-    images = read_images(street_views, city, index)
+    images = read_images(street_views, city, index, image_dir)
     start_point = get_strat_point(sub_g)
     # print_bottom(sub_g, street_views, colors_edge, colors)
     return sub_g, street_views, images
@@ -327,14 +332,14 @@ def transfer_image(model, model_name, image, preprocessor):
     return image
 
 
-def get_images(index, city, model_name, model, preprocessor):
+def get_images(index, city, model_name, model, preprocessor, image_dir):
     index = int(index)
 
-    real_root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/squeeze_images"
+    real_root_path = f"{image_dir}/{city_names[city]}/{index}/squeeze_images"
 
-    root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/images"
+    root_path = f"{image_dir}/{city_names[city]}/{index}/images"
 
-    embedding_dir = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/image_embeddings"
+    embedding_dir = f"{image_dir}/{city_names[city]}/{index}/image_embeddings"
 
     os.makedirs(embedding_dir, exist_ok=True)
 
@@ -367,14 +372,6 @@ def get_images(index, city, model_name, model, preprocessor):
         else:
             embedding = np.load(embed_path)
         images.append(embedding)
-    '''
-    if len(images) >= 10:
-        success_patch = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/success"
-        try:
-            os.makedirs(success_patch, exist_ok=True)
-        except Exception as e:
-            pass
-    '''
     return None, images
 
 
@@ -387,12 +384,12 @@ os.makedirs(real_root_path, exist_ok=True)
 '''
 
 
-def get_imagery(index, city, model_name, model, preprocessor):
+def get_imagery(index, city, model_name, model, preprocessor, image_dir):
     index = int(index)
 
-    root_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite.tif"
+    root_path = f"{image_dir}/{city_names[city]}/{index}/satellite.tif"
 
-    embeding_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite_embedding_{model_name}.npy"
+    embeding_path = f"{image_dir}/{city_names[city]}/{index}/satellite_embedding_{model_name}.npy"
 
     if not os.path.exists(embeding_path):
         image = Image.open(root_path).convert('RGB')
@@ -405,18 +402,18 @@ def get_imagery(index, city, model_name, model, preprocessor):
     return None, embedding
 
 
-def load_task_data(city, target):
-    return np.load(f"/home/wangb/zhangrx/LLMInvestrigator/data/TaskData/{city_names[city]}/{value_paths[target]}.npy")
+def load_task_data(city, target, task_dir):
+    return np.load(f"{task_dir}/{city_names[city]}/{value_paths[target]}.npy")
 
 
 from loguru import logger
 
 
-def init_logging(args, prefix):
-    os.makedirs(f"./logs/{args.model}", exist_ok=True)
+def init_logging(args, prefix, log_dir):
+    os.makedirs(f"{log_dir}/{args.model}", exist_ok=True)
     logger.remove(handler_id=None)  # remove default logger
     file_name = f"{prefix}-{args.model}-{args.city_size}-{args.target}-{args.seed}-{args.lr}.log"
-    logger.add(os.path.join("./logs", file_name), level="INFO")
+    logger.add(os.path.join(f"{log_dir}", file_name), level="INFO")
     logger.info(args)
 
 
@@ -460,6 +457,26 @@ def calc(phase, epoch, all_predicts, all_y, all_city, loss, city_size, target):
     calc_one(phase, epoch, new_predicts, new_y, loss, f'{city_names[i]}: {target_name}')
 
     return calc_one(phase, epoch, all_predicts, all_y, loss, 'Total')
+
+
+def get_model(args):
+    import json
+    with open(f"./data/config.json", 'r') as f:
+        data = json.load(f)
+
+    data = data[args.location]
+    model_path = data[args.llm]
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    model = AutoModel.from_pretrained(model_path,
+                                      torch_dtype=torch.float16,
+                                      trust_remote_code=True)
+    model = model.to(device=args.gpu)
+
+    tokenizer = AutoTokenizer.from_pretrained('/home/wangb/zhangrx/models/MiniCPM-Llama3-V-2_5',
+                                              trust_remote_code=True)
+    model.eval()
+
+    return model, tokenizer
 
 
 def init_seed(seed):

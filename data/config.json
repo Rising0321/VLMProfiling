@@ -1,0 +1,15 @@
+{
+  "wb": {
+    "image_dir": "/home/wangb/OpenVIRL/data",
+    "task_dir": "/home/wangb/zhangrx/LLMInvestrigator/data/TaskData",
+    "log_dir": "/home/wangb/zhangrx/LLMInvestrigator/logs",
+    "model_dir": "/home/wangb/zhangrx/LLMInvestrigator/words",
+    "save_dir": "/home/wangb/VLMProfiling/baselines",
+    "minicpm": "/home/wangb/zhangrx/models/MiniCPM-Llama3-V-2_5"
+  },
+  "zrx": {
+    "image_dir": "4900",
+    "log_dir": "files/GeoLife/",
+    "check_point_dir": ""
+  }
+}

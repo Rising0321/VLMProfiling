@@ -1,5 +1,6 @@
 # encoding: utf-8
-from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed, init_logging
+from utils.io_utils import load_access_street_view, get_images, load_task_data, calc, init_seed, get_imagery, \
+    init_logging, parse_json
 
 import argparse
 import os
@@ -9,7 +10,7 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from baselines.MAE import models_vit
-from data.datasets import DownStream2Dataset
+from data.datasets import DownStreamDataset, ImageryDataset
 from transformers import AutoImageProcessor, ResNetForImageClassification
 from transformers import ViTImageProcessor, ViTModel
 
@@ -29,19 +30,11 @@ embed_dims = {
 class Linear(nn.Module):
     def __init__(self, embed_dim):
         super().__init__()
-        self.project = nn.Linear(embed_dim * 11, 1)
+        self.project = nn.Linear(embed_dim, 1)
+        self.act = nn.GELU()
 
     def forward(self, image_latent):
-        # temp = torch.max(image_latent, 1)[0]
-        # temp = torch.sum(image_latent, dim=1)
-        # temp = torch.mean(image_latent, dim=1)
-        temp = image_latent.view(image_latent.size(0), -1)
-        # batch = image_latent.shape[0]
-        # weights_10 = torch.full((batch, 10), 1 / 20)
-        # weights_1 = torch.full((batch, 1), 1 / 2)
-        # weights = torch.cat((weights_10, weights_1), dim=1).unsqueeze(-1).cuda()
-        # temp = torch.sum(weights * image_latent, dim=1)
-        logits = self.project(temp)
+        logits = self.project(image_latent)
         return logits.squeeze(1)
 
 
@@ -155,39 +148,38 @@ def main(args):
     # pip install timm==0.3.2
     # todo: change timm to 1.0.7
 
+    image_dir, model_dir, save_dir, log_dir, task_dir = parse_json(args)
+
     init_seed(args.seed)
 
-    type = "sv+im"
+    type = "im"
 
-    init_logging(args, type)
+    init_logging(args, type, log_dir)
 
-    checkpoints_dir = f"/home/wangb/VLMProfiling/baselines/{args.model}/checkpoints/cat-{type}-{args.city_size}-{args.target}.pt"
-    os.makedirs(f"/home/wangb/VLMProfiling/baselines/{args.model}/checkpoints/", exist_ok=True)
+    checkpoints_dir = f"{save_dir}/{args.model}/checkpoints/single-{type}-{args.city_size}-{args.target}.pt"
+    os.makedirs(f"{save_dir}/{args.model}/checkpoints/", exist_ok=True)
 
     image_dataset = []
 
     city = args.city_size
 
-    # todo: for test, can repeat the following code with
-    ava_indexs = load_access_street_view(city)
-
-    task_data = load_task_data(city, args.target)
+    ava_indexs = load_access_street_view(image_dir, city)
 
     model, preprocessor = None, None
 
+    task_data = load_task_data(city, args.target, task_dir)
     for index in tqdm(ava_indexs):
-        sucess_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/success"
+        sucess_path = f"{image_dir}/{city_names[city]}/{index}/success"
         if not os.path.exists(sucess_path):
             continue
-        _, images = get_images(index, city, args.model, model, preprocessor)
-        satellite = np.load(
-            f'/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/satellite_embedding_{args.model}.npy')
-        image_dataset.append([images, task_data[int(index)][-1], city, satellite])
+        _, images = get_imagery(index, city, args.model, model, preprocessor, image_dir)
+        image_dataset.append([images, task_data[int(index)][-1], city])
 
     # split the dataset into train and test
     train_size = int(0.7 * len(image_dataset))
     val_size = int(0.8 * len(image_dataset)) - train_size
     test_size = len(image_dataset) - train_size - val_size
+    print(train_size, val_size, test_size)
 
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
@@ -195,9 +187,12 @@ def main(args):
     if len(test_dataset) > 100:
         test_dataset, _ = torch.utils.data.random_split(test_dataset, [100, len(test_dataset) - 100])
 
-    train_dataset = DownStream2Dataset(train_dataset, args.target)
-    val_dataset = DownStream2Dataset(val_dataset, args.target, train_dataset.mean, train_dataset.std)
-    test_dataset = DownStream2Dataset(test_dataset, args.target, train_dataset.mean, train_dataset.std)
+    train_dataset = ImageryDataset(train_dataset, args.target, model_name=args.model, preprocessor=preprocessor)
+    val_dataset = ImageryDataset(val_dataset, args.target, train_dataset.mean, train_dataset.std, model_name=args.model,
+                                 preprocessor=preprocessor)
+    test_dataset = ImageryDataset(test_dataset, args.target, train_dataset.mean, train_dataset.std,
+                                  model_name=args.model,
+                                  preprocessor=preprocessor)
 
     # data loader
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
@@ -212,39 +207,46 @@ def main(args):
     best_val = -123456789
     best_turn = 0
 
-    if args.test == 0:
-        for epoch in range(args.epoch):
-            train(model, criterion, optimizer, train_loader, args, epoch, args.city_size)
-            cur_metrics = evaluate(model, val_loader, args, epoch, args.city_size)
-            # evaluate(model, test_loader, args, "test")
+    for epoch in range(args.epoch):
+        train(model, criterion, optimizer, train_loader, args, epoch, args.city_size)
+        cur_metrics = evaluate(model, val_loader, args, epoch, args.city_size)
+        evaluate(model, test_loader, args, epoch, args.city_size)
+        # evaluate(model, test_loader, args, "test")
 
-            if cur_metrics['r2'] > best_val:
+        if cur_metrics['r2'] > best_val:
 
-                checkpoint_dict = {
-                    "epoch": epoch + 1,
-                    "state_dict": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                }
+            checkpoint_dict = {
+                "epoch": epoch + 1,
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+            }
 
-                torch.save(
-                    checkpoint_dict,
-                    checkpoints_dir,
-                )
-                best_val = cur_metrics['r2']
-                best_turn = 0
-            else:
-                best_turn += 1
-                if best_turn > args.patience:
-                    break
-        # load state dict
+            torch.save(
+                checkpoint_dict,
+                checkpoints_dir,
+            )
+            best_val = cur_metrics['r2']
+            print("best:", best_val)
+            best_turn = 0
+        else:
+            best_turn += 1
+            if best_turn > args.patience:
+                break
+    # load state dict
     checkpoint = torch.load(checkpoints_dir)
     model.load_state_dict(checkpoint['state_dict'])
     evaluate(model, test_loader, args, "test", args.city_size)
 
 
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--location",
+        type=str,
+        default="wb",
+        help="wb or zrx",
+    )
 
     parser.add_argument(
         "--save_name",
@@ -256,7 +258,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="ResNet",
+        default="CLIP",  # or ResNet
         choices=["MAE", "ResNet", "SimCLR", "CLIP", "ViT"],
         help="model name",
     )
@@ -307,7 +309,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target",
         type=int,
-        default=1,
+        default=2,
         help="Carbon or Population or NightLight",
     )
 
@@ -316,13 +318,6 @@ if __name__ == "__main__":
         type=int,
         default=42,
         help="seed",
-    )
-
-    parser.add_argument(
-        "--test",
-        type=int,
-        default=1,
-        help="test or not",
     )
 
     args = parser.parse_args()
