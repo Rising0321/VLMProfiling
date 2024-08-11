@@ -140,7 +140,9 @@ def evaluate(model, loader, args, epoch, city_size):
 
     return calc("Eval", epoch, all_predicts, all_y, all_city, None, city_size, args.target)
 
+
 city_names = ["New York City", "San Francisco", "Washington", "Chicago"]
+
 
 def main(args):
     # pip install timm==0.3.2
@@ -152,9 +154,8 @@ def main(args):
 
     init_logging(args, type)
 
-    checkpoints_dir = f"./baselines/{args.model}/{type}/checkpoints/{args.save_name}.pt"
-
-    os.makedirs(checkpoints_dir.replace(f"{args.save_name}.pt", ""), exist_ok=True)
+    checkpoints_dir = f"/home/wangb/VLMProfiling/baselines/{args.model}/checkpoints/single-{type}-{args.city_size}-{args.target}.pt"
+    os.makedirs(f"/home/wangb/VLMProfiling/baselines/{args.model}/checkpoints/", exist_ok=True)
 
     image_dataset = []
 
@@ -163,7 +164,7 @@ def main(args):
 
     ava_indexs = load_access_street_view(city)
 
-    model, preprocessor = prepare_model(args)
+    model, preprocessor = None, None
 
     task_data = load_task_data(city, args.target)
     for index in tqdm(ava_indexs):
@@ -182,10 +183,14 @@ def main(args):
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
 
+    if len(test_dataset) > 100:
+        test_dataset, _ = torch.utils.data.random_split(test_dataset, [100, len(test_dataset) - 100])
+
     train_dataset = ImageryDataset(train_dataset, args.target, model_name=args.model, preprocessor=preprocessor)
     val_dataset = ImageryDataset(val_dataset, args.target, train_dataset.mean, train_dataset.std, model_name=args.model,
                                  preprocessor=preprocessor)
-    test_dataset = ImageryDataset(test_dataset, args.target, train_dataset.mean, train_dataset.std, model_name=args.model,
+    test_dataset = ImageryDataset(test_dataset, args.target, train_dataset.mean, train_dataset.std,
+                                  model_name=args.model,
                                   preprocessor=preprocessor)
 
     # data loader

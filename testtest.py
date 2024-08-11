@@ -1,7 +1,9 @@
 import os
 
 models = ["ResNet", "SimCLR", "CLIP", "ViT", "MAE"]
-cities = [3]
+# cities = [0]
+cities = [1]
+
 targets = [0, 1, 2]
 lrs = [1e-3, 1e-4, 1e-5, 5e-4, 5e-5]
 # excute python main_train_imagery.py --model {model} --city_size {city} --target {target}

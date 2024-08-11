@@ -161,8 +161,8 @@ def main(args):
 
     init_logging(args, type)
 
-    checkpoints_dir = f"./baselines/{args.model}/checkpoints/cat-{type}-{args.city_size}-{args.target}.pt"
-    os.makedirs(f"./baselines/{args.model}/checkpoints/", exist_ok=True)
+    checkpoints_dir = f"/home/wangb/VLMProfiling/baselines/{args.model}/checkpoints/cat-{type}-{args.city_size}-{args.target}.pt"
+    os.makedirs(f"/home/wangb/VLMProfiling/baselines/{args.model}/checkpoints/", exist_ok=True)
 
     image_dataset = []
 
@@ -173,7 +173,7 @@ def main(args):
 
     task_data = load_task_data(city, args.target)
 
-    model, preprocessor = prepare_model(args)
+    model, preprocessor = None, None
 
     for index in tqdm(ava_indexs):
         sucess_path = f"/home/wangb/OpenVIRL/data/{city_names[city]}/{index}/success"
@@ -192,6 +192,9 @@ def main(args):
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(image_dataset, [train_size, val_size, test_size])
 
+    if len(test_dataset) > 100:
+        test_dataset, _ = torch.utils.data.random_split(test_dataset, [100, len(test_dataset) - 100])
+
     train_dataset = DownStream2Dataset(train_dataset, args.target)
     val_dataset = DownStream2Dataset(val_dataset, args.target, train_dataset.mean, train_dataset.std)
     test_dataset = DownStream2Dataset(test_dataset, args.target, train_dataset.mean, train_dataset.std)
@@ -209,30 +212,31 @@ def main(args):
     best_val = -123456789
     best_turn = 0
 
-    for epoch in range(args.epoch):
-        train(model, criterion, optimizer, train_loader, args, epoch, args.city_size)
-        cur_metrics = evaluate(model, val_loader, args, epoch, args.city_size)
-        # evaluate(model, test_loader, args, "test")
+    if args.test == 0:
+        for epoch in range(args.epoch):
+            train(model, criterion, optimizer, train_loader, args, epoch, args.city_size)
+            cur_metrics = evaluate(model, val_loader, args, epoch, args.city_size)
+            # evaluate(model, test_loader, args, "test")
 
-        if cur_metrics['r2'] > best_val:
+            if cur_metrics['r2'] > best_val:
 
-            checkpoint_dict = {
-                "epoch": epoch + 1,
-                "state_dict": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-            }
+                checkpoint_dict = {
+                    "epoch": epoch + 1,
+                    "state_dict": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                }
 
-            torch.save(
-                checkpoint_dict,
-                checkpoints_dir,
-            )
-            best_val = cur_metrics['r2']
-            best_turn = 0
-        else:
-            best_turn += 1
-            if best_turn > args.patience:
-                break
-    # load state dict
+                torch.save(
+                    checkpoint_dict,
+                    checkpoints_dir,
+                )
+                best_val = cur_metrics['r2']
+                best_turn = 0
+            else:
+                best_turn += 1
+                if best_turn > args.patience:
+                    break
+        # load state dict
     checkpoint = torch.load(checkpoints_dir)
     model.load_state_dict(checkpoint['state_dict'])
     evaluate(model, test_loader, args, "test", args.city_size)
@@ -312,6 +316,13 @@ if __name__ == "__main__":
         type=int,
         default=42,
         help="seed",
+    )
+
+    parser.add_argument(
+        "--test",
+        type=int,
+        default=1,
+        help="test or not",
     )
 
     args = parser.parse_args()

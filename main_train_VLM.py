@@ -1,6 +1,8 @@
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 # encoding: utf-8
 import argparse
-import os
 import random
 import numpy as np
 import torch
@@ -10,7 +12,7 @@ from tqdm import tqdm, trange
 from data.datasets import DownStreamDataset, WalkDataset
 from utils.io_utils import load_access_street_view, load_task_data, calc, init_seed, init_logging, \
     get_graph_and_images_dual, shrink_graph
-from DualVLMWalk import ask_start_image, ask_middle_image, get_model
+from DualVLMWalk import ask_start_image, ask_middle_image, get_model, ask_summary_image
 import concurrent.futures
 
 embed_dims = {
@@ -39,15 +41,44 @@ class Linear(nn.Module):
         logits = self.project(temp)
         return logits
 
-def random_walk(g, start_point, args, index, llm, tokenizer, images):
+
+def output_words(city, index, text, model_name="minicpm"):
+    file_name = f"./log/supervised/{city}/{index}.md"
+    os.makedirs(f"./log/supervised/{city}/", exist_ok=True)
+
+    # 打开文件，追加内容，然后关闭文件
+    with open(file_name, 'a') as file:
+        file.write("\n")
+        file.write(text)
+        file.write("\n")
+
+
+def output_images(city, index, image, model_name="minicpm"):
+    file_name = f"./log/supervised/{city}/{index}_image.md"
+    os.makedirs(f"./log/supervised/{city}/", exist_ok=True)
+
+    # 打开文件，追加内容，然后关闭文件
+    with open(file_name, 'a') as file:
+        file.write("\n")
+        file.write(str(image))
+        file.write("\n")
+
+
+def random_walk(g, start_point, args, index, llm, tokenizer, images, city):
+    output_words(city, index, "# Experimental Result")
+    output_words(city, index, "##  Start Edge Caption")
+
     id = int(g.nodes[start_point]["image"])
     image = images[id]
+    output_words(city, index, f"![no_name](../../data/{city}/{index}/squeeze_images/{id}.jpg)")
+    output_images(city, index, id)
+
     images_emb = []
     summary = ask_start_image(llm, tokenizer, image, "")
-    for i in trange(10):
+    output_words(city, index, summary)
+
+    for i in trange(9):
         try:
-            embedding_path = f"/home/wangb/OpenVIRL/data/{city_names[args.city_size]}/{index}/image_embeddings/{g.nodes[start_point]['image']}-{args.model}.npy"
-            images_emb.append(np.load(embedding_path))
             neighbors = list(g.neighbors(start_point))
             best_neighbor = -1
             best_answer = -1
@@ -56,19 +87,34 @@ def random_walk(g, start_point, args, index, llm, tokenizer, images):
                 id = int(g.nodes[neighbor]["image"])
                 now_image = images[id]
                 answer, reason = ask_middle_image(llm, tokenizer, now_image, summary)
+
+                output_words(city, index,
+                             f"![no_name](../../data/{city}/{index}/squeeze_images/{id}.jpg)")
+                output_words(city, index, reason)
+
                 if answer > best_answer:
                     best_answer = answer
                     best_neighbor = neighbor
+                    best_image = now_image
+                    output_words(city, index, "best answer updated!!!!!!!!!!!!!!!!")
+
             start_point = best_neighbor
+
+            output_words(city, index, f"###  update summary")
+            summary = ask_summary_image(llm, tokenizer, best_image, summary)
+            output_words(city, index, summary)
+
+            output_images(city, index, int(g.nodes[best_neighbor]["image"]))
         except Exception as e:
             print(e)
+            continue
     # exit(0)
     return torch.tensor(images_emb).float()
 
 
-def evaluate(model, loader, args, llm, tokenizer):
+def evaluate(model, loader, args, llm, tokenizer, city):
     device = torch.device(args.gpu)
-    model.eval()
+    # model.eval()
 
     all_y = []
     all_predicts = []
@@ -77,39 +123,37 @@ def evaluate(model, loader, args, llm, tokenizer):
     for index, y, s in tqdm(loader):
         index = int(index[0])
 
-        # if index == 983 or index == 979:
-        #     continue
         sub_g, street_views, images = get_graph_and_images_dual(index, args.city_size, args.target)
 
         new_g, start_point = shrink_graph(sub_g)
 
-        image_emb = random_walk(new_g, start_point, args, index, llm, tokenizer, images)
-        image_emb = torch.cat((image_emb, s), dim=0)
-        image_emb = image_emb.to(device)
-        image_latent = model(image_emb)
+        random_walk(new_g, start_point, args, index, llm, tokenizer, images, city)
+        continue
 
-        all_predicts.append(float(image_latent.cpu().detach()))
-        all_y.append(float(y.cpu().detach()))
-        all_city.append(args.city_size)
-
-    return calc("Eval", 233, all_predicts, all_y, all_city, None, args.city_size, args.target)
+    return
+    #     image_emb = random_walk(new_g, start_point, args, index, llm, tokenizer, images)
+    #     image_emb = torch.cat((image_emb, s), dim=0)
+    #     image_emb = image_emb.to(device)
+    #     image_latent = model(image_emb)
+    #
+    #     all_predicts.append(float(image_latent.cpu().detach()))
+    #     all_y.append(float(y.cpu().detach()))
+    #     all_city.append(args.city_size)
+    #
+    # return calc("Eval", 233, all_predicts, all_y, all_city, None, args.city_size, args.target)
 
 
 city_names = ["New York City", "San Francisco", "Washington", "Chicago"]
 
+
+# run_logs = "./run_logs/city/"
+# zero_logs = "./zero_logs/city/target/"
 
 def main(args):
     # pip install timm==0.3.2
     # todo: change timm to 1.0.7
 
     init_seed(args.seed)
-
-    type = "sv+im"
-
-    init_logging(args, "random")
-
-    checkpoints_dir = f"./baselines/{args.model}/checkpoints/cat-{type}-{args.city_size}-{args.target}.pt"
-    # os.makedirs(checkpoints_dir.replace(f"{args.save_name}.pt", ""), exist_ok=True)
 
     idx_dataset = []
 
@@ -138,6 +182,9 @@ def main(args):
     train_dataset, val_dataset, test_dataset = \
         torch.utils.data.random_split(idx_dataset, [train_size, val_size, test_size])
 
+    if len(test_dataset) > 100:
+        test_dataset, _ = torch.utils.data.random_split(test_dataset, [100, len(test_dataset) - 100])
+
     train_dataset = WalkDataset(train_dataset, args.target)
     val_dataset = WalkDataset(val_dataset, args.target, train_dataset.mean, train_dataset.std)
     test_dataset = WalkDataset(test_dataset, args.target, train_dataset.mean, train_dataset.std)
@@ -145,15 +192,16 @@ def main(args):
     # data loader
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-    model = Linear(embed_dims[args.model], type).to(args.gpu)
-    checkpoint = torch.load(checkpoints_dir)
-    model.load_state_dict(checkpoint['state_dict'])
+    # model = Linear(embed_dims[args.model], type).to(args.gpu)
+    # checkpoint = torch.load(checkpoints_dir)
+    # model.load_state_dict(checkpoint['state_dict'])
+    model = None
 
-    evaluate(model, test_loader, args, llm, tokenizer)
+    evaluate(model, test_loader, args, llm, tokenizer, city_names[city])
 
 
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
