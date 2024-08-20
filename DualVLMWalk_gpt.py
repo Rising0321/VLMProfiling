@@ -224,63 +224,51 @@ def ask_middle_image(model, tokenizer, image, previous_summary, args):
     while True:
         try:
             generated_text = ""
-            if args.llm == "FireLLaVA" or args.llm == "Gemini" or args.llm == "Claude":
-                model_api = ""
-                if args.llm == "FireLLaVA":
-                    model_api = "fireworks/firellava-13b"
-                elif args.llm == "Gemini":
-                    model_api = "google/gemini-flash-1.5"
-                elif args.llm == "Claude":
-                    model_api = "anthropic/claude-3-haiku"
+            model_api = ""
+            if args.llm == "FireLLaVA":
+                model_api = "fireworks/firellava-13b"
+            elif args.llm == "Gemini":
+                model_api = "google/gemini-flash-1.5"
+            elif args.llm == "Claude":
+                model_api = "anthropic/claude-3-haiku"
 
-                # 图片处理成 base64 的编码形式
-                buffered = BytesIO()
-                image.save(buffered, format="JPEG")
-                encoded_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
-                image_base64 = f"data:image/jpeg;base64,{encoded_image}"
-                # print("sent requests")
-                response = requests.post(
-                    url="https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    },
-                    data=json.dumps({
-                        "model": model_api,  # Optional
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": question
-                                    },
-                                    {
-                                        "type": "image_url",
-                                        "image_url": image_base64
-                                    }
-                                ]
-                            }
-                        ]
-                    })
-                )
-                # print(response.json())
-                res = response.json()
-                generated_text = res['choices'][0]['message']['content']
-            else:
-                res = model.chat(
-                    image=image,
-                    msgs=msgs,
-                    tokenizer=tokenizer,
-                    sampling=True,
-                    temperature=0.2,
-                    stream=True
-                )
-
-                for new_text in res:
-                    generated_text += new_text
+            # 图片处理成 base64 的编码形式
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            encoded_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            image_base64 = f"data:image/jpeg;base64,{encoded_image}"
+            # print("sent requests")
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                },
+                data=json.dumps({
+                    "model": model_api,  # Optional
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": question
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": image_base64
+                                }
+                            ]
+                        }
+                    ]
+                })
+            )
+            # print(response.json())
+            res = response.json()
+            generated_text = res['choices'][0]['message']['content']
 
             # print(generated_text + "\n text is over\n")
             score = get_score(generated_text, args)
+            print("success")
             return score, generated_text
 
         except Exception as e:

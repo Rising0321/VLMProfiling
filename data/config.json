@@ -3,7 +3,7 @@
     "image_dir": "/home/wangb/OpenVIRL/data",
     "task_dir": "/home/wangb/zhangrx/LLMInvestrigator/data/TaskData",
     "log_dir": "/home/wangb/zhangrx/LLMInvestrigator/logs",
-    "model_dir": "/home/wangb/zhangrx/LLMInvestrigator/words",
+    "model_dir": "/home/wangb/zhangrx/LLMInvestrigator",
     "save_dir": "/home/wangb/VLMProfiling/baselines",
     "minicpm": "/home/wangb/zhangrx/models/MiniCPM-Llama3-V-2_5"
   },
@@ -14,5 +14,12 @@
     "model_dir": "/home/zhangrx/VLMInvest/words",
     "save_dir": "/home/zhangrx/VLMInvest/baselines",
     "minicpm": "/home/zhangrx/VLMInvest/llms/MiniCPM-Llama3-V-2_5"
+  },
+  "local": {
+    "image_dir": "D:\\Code\\OpenVIRL\\data",
+    "task_dir": "D:\\Code\\OpenVIRL\\data\\task",
+    "log_dir": "D:\\Code\\VLMProfiling\\logs",
+    "model_dir": "D:\\Code\\VLMProfiling\\logs",
+    "save_dir": ""
   }
 }

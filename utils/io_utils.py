@@ -80,9 +80,12 @@ def load_access_street_view(image_dir, city):
 def read_images(street_views, city, index, image_dir):
     images = {}
     for idx, item in street_views.iterrows():
-        path = f"{image_dir}/{city_names[city]}/{index}/squeeze_images/{item['id_0']}.jpg"
+        path = os.path.join(image_dir, f'{city_names[city]}', f'{index}', 'squeeze_images', f"{item['id_0']}.jpg")
+        # path = f"{image_dir}/{city_names[city]}/{index}/squeeze_images/{item['id_0']}.jpg"
         if not os.path.exists(path):
             real_path = path.replace('squeeze_images', 'images')
+            success_dir = os.path.join(image_dir, f'{city_names[city]}', f'{index}', 'squeeze_images')
+            os.makedirs(success_dir, exist_ok=True)
             image = Image.open(real_path).convert('RGB')
             image = image.resize((224, 224))
             # save image to real_root_path

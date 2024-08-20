@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm, trange
+import matplotlib.pyplot as plt
 
 from data.datasets import DownStreamDataset, WalkDataset
 from utils.io_utils import load_access_street_view, load_task_data, init_seed, \
@@ -46,70 +47,55 @@ def get_image_cnt(city, index, path, model_dir, model_name):
     with open(path, 'r', encoding='utf-8') as file:
         content = file.read()
 
-    images = [i for i in list(content.split('\n')) if i]
+    images = [i for i in list(content.split('\n')) if i][-9:]
 
-    return len(images) >= 10
+    return images
 
 
 def random_walk(g, start_point, args, index, llm, tokenizer, images, city, model_dir):
-    output_words(city, index, "# Experimental Result", model_dir, llm)
-    output_words(city, index, "##  Start Edge Caption", model_dir, llm)
-
     id = int(g.nodes[start_point]["image"])
     image = images[id]
-    output_words(city, index, f"![no_name](../../data/{city}/{index}/squeeze_images/{id}.jpg)", model_dir, llm)
-    output_images(city, index, id, model_dir, llm)
-
-    images_emb = []
-    summary = ask_start_image(llm, tokenizer, image, "", args)
-    output_words(city, index, summary, model_dir, llm)
-
-    for i in trange(9):
+    images = get_image_cnt(city, index, llm, model_dir, llm)
+    plt.plot(start_point[0], start_point[1], 'x', color='red', markersize=20)
+    for i in range(9):
         try:
             neighbors = list(g.neighbors(start_point))
-            best_neighbor = -1
-            best_answer = -1
-            best_image = -1
+            tmp = -1
             for neighbor in neighbors:
                 id = int(g.nodes[neighbor]["image"])
-                now_image = images[id]
-                answer, reason = ask_middle_image(llm, tokenizer, now_image, summary, args)
-
-                output_words(city, index,
-                             f"![no_name](../../data/{city}/{index}/squeeze_images/{id}.jpg)", model_dir, llm)
-                output_words(city, index, reason, model_dir, llm)
-
-                if answer > best_answer:
-                    best_answer = answer
-                    best_neighbor = neighbor
-                    best_image = now_image
-                    output_words(city, index, "best answer updated!!!!!!!!!!!!!!!!", model_dir, llm)
-
-            start_point = best_neighbor
-
-            output_words(city, index, f"###  update summary", model_dir, llm)
-            summary = ask_summary_image(llm, tokenizer, best_image, summary, args)
-            output_words(city, index, summary, model_dir, llm)
-
-            output_images(city, index, int(g.nodes[best_neighbor]["image"]), model_dir, llm)
+                # print(neighbor, id)
+                if id == int(images[i]):
+                    tmp = neighbor
+                    # print("heree")
+                    break
+            # print(start_point, tmp)
+            if tmp == -1:
+                raise ValueError("tmp can not be -1")
+            plt.quiver(start_point[0], start_point[1], tmp[0] - start_point[0], tmp[1] - start_point[1]
+                       , angles='xy', scale_units='xy', scale=1, color="r")
+            start_point = tmp
         except Exception as e:
-            print(e)
+            print(index, e)
             continue
-    # exit(0)
-    return torch.tensor(images_emb).float()
+
+    # print(index)
+    os.makedirs(f'./case/{index}/', exist_ok=True)
+    plt.savefig(f'./case/{index}/{llm}.png')
+    plt.close('all')
+    return 0
 
 
 def evaluate(loader, args, llm, tokenizer, city, model_dir, image_dir):
     for index in tqdm(loader):
         index = int(index)
 
-        if get_image_cnt(city, index, "", model_dir, llm):
-            print(f"skip {index}")
-            continue
-        else:
-            if os.path.exists(f"{model_dir}/supervised/{city}/{llm}/{index}_image.md"):
-                os.remove(f"{model_dir}/supervised/{city}/{llm}/{index}_image.md")
-                os.remove(f"{model_dir}/supervised/{city}/{llm}/{index}.md")
+        # if get_image_cnt(city, index, "", model_dir, llm):
+        #     print(f"skip {index}")
+        #     continue
+        # else:
+        #     if os.path.exists(f"{model_dir}/supervised/{city}/{llm}/{index}_image.md"):
+        #         os.remove(f"{model_dir}/supervised/{city}/{llm}/{index}_image.md")
+        #         os.remove(f"{model_dir}/supervised/{city}/{llm}/{index}.md")
 
         sub_g, street_views, images = get_graph_and_images_dual(index, args.city_size, image_dir)
 
@@ -160,10 +146,8 @@ def main(args):
     for index, y in test_dataset:
         index = int(index)
 
-    if args.llm == "FireLLaVA" or args.llm == "Gemini" or args.llm == "Claude":
+    if args.llm == "FireLLaVA" or args.llm == "Gemini" or args.llm == "Claude" or args.llm == 'minicpm':
         llm, tokenizer = args.llm, 0
-    # else:
-    # llm, tokenizer = get_model(args)
 
     test_dataset = ['2141', '901', '2717', '1307', '2569', '1629', '1603', '1655', '1323', '844', '1696', '1341',
                     '1990', '1449', '1465', '1571', '654', '978', '1371', '2046', '1344', '2045', '853', '2042', '2226',
